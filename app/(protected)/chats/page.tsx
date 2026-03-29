@@ -84,7 +84,7 @@ export default async function ChatsPage() {
     );
   } catch { /* non-fatal */ }
 
-  function getOtherPartyName(conv: typeof convs[0]): string {
+  function getOtherPartyName(conv: NonNullable<typeof convs>[0]): string {
     const otherId = conv.guest_id === user.id ? conv.host_id : conv.guest_id;
     if (profileMap[otherId]) return profileMap[otherId];
     const email = emailMap[otherId];

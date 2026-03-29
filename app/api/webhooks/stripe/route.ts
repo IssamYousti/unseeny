@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       try {
         const { sendBookingConfirmed } = await import("@/lib/email");
         const { createNotification } = await import("@/lib/data/notifications");
-        const listingTitle = (booking.listings as { title: string } | null)?.title ?? "the property";
+        const listingTitle = (booking.listings as unknown as { title: string } | null)?.title ?? "the property";
 
         await createNotification({
           userId: booking.guest_id,
