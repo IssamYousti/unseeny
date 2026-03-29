@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { unstable_noStore } from "next/cache";
 
 export function getListingImageUrl(storagePath: string): string {
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const base = process.env.SUPABASE_URL!;
   return `${base}/storage/v1/object/public/listing-images/${storagePath}`;
 }
 

@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { stripe } from "@/lib/stripe";
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+const BASE_URL = process.env.APP_URL ?? "http://localhost:3000";
 
 export async function initiatePayment(bookingId: string) {
   const supabase = await createClient();

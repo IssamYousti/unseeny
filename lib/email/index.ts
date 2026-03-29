@@ -4,7 +4,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 // TODO: replace with "Unseeny <noreply@unseeny.com>" once a domain is verified in Resend
 const FROM = "Unseeny <onboarding@resend.dev>";
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+const BASE_URL = process.env.APP_URL ?? "http://localhost:3000";
 
 // ─── Shared template wrapper ──────────────────────────────────────────────────
 

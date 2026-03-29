@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { createNotification } from "@/lib/data/notifications";
 import { sendBookingRequest } from "@/lib/email";
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+const BASE_URL = process.env.APP_URL ?? "http://localhost:3000";
 
 export async function createBooking(_prev: unknown, formData: FormData) {
   const supabase = await createClient();
