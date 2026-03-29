@@ -7,11 +7,11 @@ import { redirect } from "next/navigation";
 async function requireApprovedHost(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
   const { data: role, error } = await supabase
     .from("roles")
-    .select("is_approved_owner")
+    .select("is_approved_host")
     .eq("user_id", userId)
     .single();
 
-  if (error || !role?.is_approved_owner) {
+  if (error || !role?.is_approved_host) {
     throw new Error("Not allowed: only approved hosts can manage listings");
   }
 }
@@ -44,6 +44,7 @@ export async function createOrUpdateListing(formData: FormData) {
     bedrooms: Number(formData.get("bedrooms")),
     bathrooms: Number(formData.get("bathrooms")),
     price_per_night: Number(formData.get("price_per_night")),
+    amenities: formData.getAll("amenities") as string[],
     updated_at: new Date().toISOString(),
   };
 

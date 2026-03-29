@@ -8,7 +8,7 @@ export async function getConversation(conversationId: string) {
 
   const { data: conversation } = await supabase
     .from("conversations")
-    .select("*")
+    .select("*, listings(title)")
     .eq("id", conversationId)
     .single();
 

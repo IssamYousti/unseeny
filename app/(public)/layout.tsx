@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import Navbar from "@/components/Navigationbar";
 
 export default async function PublicLayout({
   children,
@@ -12,10 +13,14 @@ export default async function PublicLayout({
     data: { user },
   } = await supabase.auth.getUser();
 
-  // If logged in → go to app
   if (user) {
     redirect("/listings");
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      <Navbar authenticated={false} />
+      {children}
+    </>
+  );
 }

@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { sendMessage } from "./actions";
+import { sendMessage, markConversationRead } from "./actions";
+import { moderateMessage, getModerationMessage } from "@/lib/moderation";
+import { AlertCircle, ArrowLeft, Send } from "lucide-react";
+import Link from "next/link";
 
 type Message = {
   id: string;
@@ -11,116 +14,330 @@ type Message = {
   created_at: string;
 };
 
+type MessageGroup = {
+  senderId: string;
+  isMe: boolean;
+  messages: Message[];
+};
+
+function buildGroups(messages: Message[], currentUserId: string): MessageGroup[] {
+  const groups: MessageGroup[] = [];
+  for (const msg of messages) {
+    const isMe = msg.sender_id === currentUserId;
+    const last = groups[groups.length - 1];
+    if (last && last.senderId === msg.sender_id) {
+      last.messages.push(msg);
+    } else {
+      groups.push({ senderId: msg.sender_id, isMe, messages: [msg] });
+    }
+  }
+  return groups;
+}
+
+function toDateKey(iso: string) {
+  return new Date(iso).toDateString();
+}
+
+function formatDateLabel(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (d.toDateString() === now.toDateString()) return "Today";
+  if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return d.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+}
+
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+}
+
+function getInitial(name: string) {
+  return name.charAt(0).toUpperCase();
+}
+
 export default function ChatClient({
   conversation,
   initialMessages,
   currentUserId,
+  otherPartyName,
+  listingTitle,
 }: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   conversation: any;
   initialMessages: Message[];
   currentUserId: string;
+  otherPartyName: string;
+  listingTitle: string | null;
 }) {
   const supabase = createClient();
 
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [text, setText] = useState("");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // realtime subscription
   useEffect(() => {
-  const channel = supabase
-    .channel("chat-" + conversation.id)
-    .on(
-      "postgres_changes",
-      {
-        event: "INSERT",
-        schema: "public",
-        table: "messages",
-        filter: `conversation_id=eq.${conversation.id}`,
-      },
-      (payload) => {
-        setMessages((prev) => [...prev, payload.new as Message]);
-      }
-    )
-    .subscribe();
+    markConversationRead(conversation.id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversation.id]);
 
-  return () => {
-    supabase.removeChannel(channel); // no await
-  };
-}, [conversation.id]);
+  useEffect(() => {
+    const channel = supabase
+      .channel("chat-" + conversation.id)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+          filter: `conversation_id=eq.${conversation.id}`,
+        },
+        (payload) => {
+          setMessages((prev) => {
+            const incoming = payload.new as Message;
+            if (prev.some((m) => m.id === incoming.id)) return prev;
+            const tempIdx = prev.findIndex(
+              (m) => m.id.startsWith("temp-") && m.sender_id === incoming.sender_id,
+            );
+            if (tempIdx !== -1) {
+              const next = [...prev];
+              next[tempIdx] = incoming;
+              return next;
+            }
+            if (incoming.sender_id !== currentUserId) {
+              markConversationRead(conversation.id);
+            }
+            return [...prev, incoming];
+          });
+        },
+      )
+      .subscribe();
 
+    return () => { supabase.removeChannel(channel); };
+  }, [conversation.id, supabase]);
 
-  // auto scroll
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   function handleSend(e: React.FormEvent) {
     e.preventDefault();
-    if (!text.trim()) return;
+    const trimmed = text.trim();
+    if (!trimmed) return;
 
-    const optimisticMessage: Message = {
-      id: "temp-" + Date.now(),
+    const check = moderateMessage(trimmed);
+    if (check.blocked) {
+      setErrorMsg(getModerationMessage(check.reason));
+      return;
+    }
+
+    setErrorMsg(null);
+    const tempId = "temp-" + Date.now();
+    const optimistic: Message = {
+      id: tempId,
       sender_id: currentUserId,
-      content: text,
+      content: trimmed,
       created_at: new Date().toISOString(),
     };
 
-    // instant UI update
-    setMessages((prev) => [...prev, optimisticMessage]);
+    setMessages((prev) => [...prev, optimistic]);
     setText("");
 
     startTransition(async () => {
-      await sendMessage(conversation.id, optimisticMessage.content);
+      const result = await sendMessage(conversation.id, trimmed);
+      if (result.error) {
+        setMessages((prev) => prev.filter((m) => m.id !== tempId));
+        setText(trimmed);
+        setErrorMsg(result.error);
+        inputRef.current?.focus();
+      }
     });
   }
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend(e as unknown as React.FormEvent);
+    }
+  }
+
+  const groups = buildGroups(messages, currentUserId);
+  const initial = getInitial(otherPartyName);
+
+  // Build list of [dateSeparator | group] entries
+  type Entry =
+    | { type: "separator"; label: string }
+    | { type: "group"; group: MessageGroup };
+
+  const entries: Entry[] = [];
+  let lastDate = "";
+  for (const group of groups) {
+    const firstDate = toDateKey(group.messages[0].created_at);
+    if (firstDate !== lastDate) {
+      entries.push({ type: "separator", label: formatDateLabel(group.messages[0].created_at) });
+      lastDate = firstDate;
+    }
+    entries.push({ type: "group", group });
+  }
+
   return (
-    <div className="max-w-3xl mx-auto py-10 flex flex-col h-[80vh]">
+    <div className="flex flex-col h-[calc(100vh-4rem)]">
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto space-y-4 border border-border rounded-2xl p-5 bg-card">
+      {/* ── Header ── */}
+      <div className="shrink-0 bg-background/95 backdrop-blur border-b border-border px-4 py-3 flex items-center gap-3">
+        <Link
+          href="/chats"
+          className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Link>
 
-        {messages.map((msg) => {
-          const isMe = msg.sender_id === currentUserId;
+        <div className="h-9 w-9 rounded-full bg-primary/15 flex items-center justify-center text-sm font-semibold text-primary shrink-0 select-none">
+          {initial}
+        </div>
 
-          return (
-            <div
-              key={msg.id}
-              className={`flex ${isMe ? "justify-end" : "justify-start"}`}
-            >
-              <div
-                className={`px-4 py-2 rounded-2xl max-w-[70%] text-sm ${
-                  isMe
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted"
-                }`}
-              >
-                {msg.content}
-              </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold leading-tight truncate">{otherPartyName}</p>
+          {listingTitle && (
+            <p className="text-xs text-muted-foreground truncate">{listingTitle}</p>
+          )}
+        </div>
+      </div>
+
+      {/* ── Messages ── */}
+      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-1">
+        {messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
+            <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-xl font-semibold text-primary select-none">
+              {initial}
             </div>
-          );
-        })}
+            <div>
+              <p className="text-sm font-medium">{otherPartyName}</p>
+              {listingTitle && <p className="text-xs text-muted-foreground mt-0.5">{listingTitle}</p>}
+            </div>
+            <p className="text-xs text-muted-foreground/60 mt-2">Send a message to start the conversation.</p>
+          </div>
+        ) : (
+          entries.map((entry, i) => {
+            if (entry.type === "separator") {
+              return (
+                <div key={`sep-${i}`} className="flex items-center gap-3 py-4">
+                  <div className="flex-1 h-px bg-border/50" />
+                  <span className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wider">
+                    {entry.label}
+                  </span>
+                  <div className="flex-1 h-px bg-border/50" />
+                </div>
+              );
+            }
 
+            const { group } = entry;
+            return (
+              <div
+                key={`group-${i}`}
+                className={`flex flex-col gap-0.5 mb-3 ${group.isMe ? "items-end" : "items-start"}`}
+              >
+                {/* Avatar for other party — shown above first bubble */}
+                {!group.isMe && (
+                  <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-[11px] font-semibold text-muted-foreground select-none mb-1 ml-1">
+                    {initial}
+                  </div>
+                )}
+
+                {group.messages.map((msg, msgIdx) => {
+                  const isFirst = msgIdx === 0;
+                  const isLast = msgIdx === group.messages.length - 1;
+                  const isTemp = msg.id.startsWith("temp-");
+
+                  // Bubble rounding: pill on single, asymmetric on grouped
+                  let rounding = "";
+                  if (group.isMe) {
+                    if (group.messages.length === 1) rounding = "rounded-2xl rounded-br-md";
+                    else if (isFirst) rounding = "rounded-2xl rounded-br-md";
+                    else if (isLast) rounding = "rounded-2xl rounded-tr-md";
+                    else rounding = "rounded-2xl rounded-r-md";
+                  } else {
+                    if (group.messages.length === 1) rounding = "rounded-2xl rounded-bl-md";
+                    else if (isFirst) rounding = "rounded-2xl rounded-bl-md";
+                    else if (isLast) rounding = "rounded-2xl rounded-tl-md";
+                    else rounding = "rounded-2xl rounded-l-md";
+                  }
+
+                  return (
+                    <div
+                      key={msg.id}
+                      className={`px-3.5 py-2 max-w-[72%] text-sm whitespace-pre-line break-words leading-relaxed ${rounding} ${
+                        group.isMe
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-foreground"
+                      } ${isTemp ? "opacity-60" : ""}`}
+                    >
+                      {msg.content}
+                    </div>
+                  );
+                })}
+
+                {/* Timestamp below last message in group */}
+                <span className="text-[11px] text-muted-foreground/50 mt-0.5 px-1">
+                  {formatTime(group.messages[group.messages.length - 1].created_at)}
+                </span>
+              </div>
+            );
+          })
+        )}
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
-      <form onSubmit={handleSend} className="flex gap-3 mt-4">
-        <input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Type a message..."
-          className="flex-1 input"
-        />
-        <button
-          disabled={isPending}
-          className="bg-primary text-primary-foreground px-5 rounded-xl"
-        >
-          Send
-        </button>
-      </form>
+      {/* ── Error banner ── */}
+      {errorMsg && (
+        <div className="shrink-0 mx-4 mb-2 flex items-start gap-2 bg-destructive/10 text-destructive text-sm rounded-xl px-4 py-2.5">
+          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          <span className="flex-1">{errorMsg}</span>
+          <button
+            type="button"
+            className="shrink-0 opacity-60 hover:opacity-100 transition text-base leading-none"
+            onClick={() => setErrorMsg(null)}
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {/* ── Input ── */}
+      <div className="shrink-0 border-t border-border bg-background px-4 py-3">
+        <form onSubmit={handleSend} className="flex items-end gap-2">
+          <textarea
+            ref={inputRef}
+            value={text}
+            rows={1}
+            onChange={(e) => {
+              setText(e.target.value);
+              if (errorMsg) setErrorMsg(null);
+              // auto-grow
+              e.target.style.height = "auto";
+              e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder="Type a message…"
+            disabled={isPending}
+            className="flex-1 resize-none bg-muted/60 border border-border rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50 leading-relaxed min-h-[42px] max-h-[120px] overflow-y-auto"
+          />
+          <button
+            type="submit"
+            disabled={isPending || !text.trim()}
+            className="h-[42px] w-[42px] shrink-0 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90 transition disabled:opacity-30"
+          >
+            <Send className="h-4 w-4" />
+          </button>
+        </form>
+        <p className="text-[11px] text-muted-foreground/40 text-center mt-2">
+          Enter to send · Shift+Enter for new line
+        </p>
+      </div>
+
     </div>
   );
 }

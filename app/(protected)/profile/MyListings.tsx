@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 
 type Listing = {
   id: string;
@@ -9,27 +10,35 @@ type Listing = {
   is_approved: boolean;
 };
 
-export default function MyListings({ listings }: { listings: Listing[] }) {
+export default async function MyListings({ listings }: { listings: Listing[] }) {
+  const t = await getTranslations("myListings");
+
   return (
     <section className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-semibold">My listings</h2>
-          <p className="text-muted-foreground text-sm">
-            Manage the homes you host on HiddenVillas.
-          </p>
+          <h2 className="text-2xl font-semibold">{t("title")}</h2>
+          <p className="text-muted-foreground text-sm">{t("description")}</p>
         </div>
 
-        <Link
-          href="/listings/manage"
-          className="bg-primary text-primary-foreground px-5 py-2 rounded-xl text-sm font-medium hover:opacity-90 transition"
-        >
-          Create listing
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/listings/bookings"
+            className="border border-border text-muted-foreground px-4 py-2 rounded-xl text-sm hover:text-foreground hover:border-foreground/30 transition"
+          >
+            {t("view_bookings")}
+          </Link>
+          <Link
+            href="/listings/manage"
+            className="bg-primary text-primary-foreground px-5 py-2 rounded-xl text-sm font-medium hover:opacity-90 transition"
+          >
+            {t("create")}
+          </Link>
+        </div>
       </div>
 
       {listings.length === 0 && (
-        <p className="text-muted-foreground">You haven't created any listings yet.</p>
+        <p className="text-muted-foreground">{t("empty")}</p>
       )}
 
       <div className="space-y-4">
@@ -46,9 +55,9 @@ export default function MyListings({ listings }: { listings: Listing[] }) {
               <p className="text-sm mt-1">
                 €{l.price_per_night} / night •{" "}
                 {l.is_approved ? (
-                  <span className="text-green-600 font-medium">Approved</span>
+                  <span className="text-green-600 font-medium">{t("approved")}</span>
                 ) : (
-                  <span className="text-orange-500 font-medium">Pending approval</span>
+                  <span className="text-orange-500 font-medium">{t("pending")}</span>
                 )}
               </p>
             </div>
@@ -57,7 +66,7 @@ export default function MyListings({ listings }: { listings: Listing[] }) {
               href={`/listings/manage/${l.id}`}
               className="text-primary font-medium hover:underline"
             >
-              Edit
+              {t("edit")}
             </Link>
           </div>
         ))}

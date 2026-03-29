@@ -1,131 +1,127 @@
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { approveListing } from "./actions";
 import { redirect } from "next/navigation";
-import { unstable_noStore } from "next/cache";
+import { getTranslations } from "next-intl/server";
+import Link from "next/link";
+import Overview from "./_tabs/overview";
+import Bookings from "./_tabs/bookings";
+import Users from "./_tabs/users";
+import Listings from "./_tabs/listings";
+import Applications from "./_tabs/applications";
+import Reviews from "./_tabs/reviews";
 
-async function AdminDashboard() {
-  unstable_noStore();
+type SearchParams = Promise<{ tab?: string; status?: string }>;
+
+async function AdminPage({ searchParams }: { searchParams: SearchParams }) {
+  const params = await searchParams;
+  const activeTab = params.tab ?? "overview";
 
   const supabase = await createClient();
-
-  // 🔐 AUTH CHECK
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/auth/login");
 
-  // 🔐 ADMIN CHECK
   const { data: role } = await supabase
     .from("roles")
     .select("is_admin")
     .eq("user_id", user.id)
     .single();
 
-  if (!role?.is_admin) redirect("/protected/listings");
+  if (!role?.is_admin) redirect("/listings");
 
-  // --- METRICS ---
+  const t = await getTranslations("admin");
 
-  const { data: totalUsers } = await supabase.rpc("count_total_users");
-  const { data: activeUsers } = await supabase.rpc("count_active_users_7d");
+  // Fetch badge counts in parallel
+  const [pendingBookingsResult, pendingListingsResult, pendingApplicationsResult] =
+    await Promise.all([
+      supabase
+        .from("bookings")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending"),
+      supabase
+        .from("listings")
+        .select("id", { count: "exact", head: true })
+        .eq("is_approved", false),
+      supabase
+        .from("host_applications")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending"),
+    ]);
 
-  const { count: totalListings } = await supabase
-    .from("listings")
-    .select("*", { count: "exact", head: true });
+  const pendingBookingsCount = pendingBookingsResult.count ?? 0;
+  const pendingListingsCount = pendingListingsResult.count ?? 0;
+  const pendingApplicationsCount = pendingApplicationsResult.count ?? 0;
 
-  const { count: approvedListings } = await supabase
-    .from("listings")
-    .select("*", { count: "exact", head: true })
-    .eq("is_approved", true);
-
-  const { data: listings } = await supabase
-    .from("listings")
-    .select("id, title, city, country, host_id, is_approved, created_at")
-    .eq("is_approved", false)
-    .order("created_at", { ascending: false });
+  const tabs = [
+    { key: "overview", label: t("tab_overview"), badge: 0 },
+    { key: "bookings", label: t("tab_bookings"), badge: pendingBookingsCount },
+    { key: "users", label: t("tab_users"), badge: 0 },
+    { key: "listings", label: t("tab_listings"), badge: pendingListingsCount },
+    { key: "applications", label: t("tab_applications"), badge: pendingApplicationsCount },
+    { key: "reviews", label: t("tab_reviews"), badge: 0 },
+  ] as const;
 
   return (
     <main className="bg-background min-h-screen">
-      <div className="max-w-6xl mx-auto px-6 py-10 space-y-10">
+      {/* Sticky tab navigation */}
+      <div className="sticky top-16 z-40 bg-background/90 backdrop-blur border-b border-border">
+        <div className="max-w-7xl mx-auto px-6">
+          <nav className="flex items-center gap-1 overflow-x-auto py-3 scrollbar-none">
+            {tabs.map((tab) => {
+              const isActive = activeTab === tab.key;
+              const href =
+                tab.key === "overview"
+                  ? "/admin"
+                  : `/admin?tab=${tab.key}`;
+              return (
+                <Link
+                  key={tab.key}
+                  href={href}
+                  className={`flex items-center gap-2 whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }`}
+                >
+                  {tab.label}
+                  {tab.badge > 0 && (
+                    <span
+                      className={`text-xs font-semibold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center leading-none ${
+                        isActive
+                          ? "bg-primary-foreground/20 text-primary-foreground"
+                          : "bg-amber-500 text-white"
+                      }`}
+                    >
+                      {tab.badge}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+      </div>
 
-        <h1 className="text-3xl font-semibold tracking-tight">
-          Admin dashboard
-        </h1>
-
-        {/* METRICS */}
-        <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          <MetricCard title="Total users" value={totalUsers ?? 0} />
-          <MetricCard title="Active users (7 days)" value={activeUsers ?? 0} />
-          <MetricCard title="Total listings" value={totalListings ?? 0} />
-          <MetricCard title="Approved listings" value={approvedListings ?? 0} />
-        </section>
-
-        {/* LISTINGS TABLE */}
-        <section className="space-y-4">
-          <h2 className="text-xl font-semibold">Pending listings</h2>
-
-          <div className="bg-card border border-border rounded-2xl overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted text-muted-foreground">
-                <tr>
-                  <th className="text-left px-4 py-3">Title</th>
-                  <th className="text-left px-4 py-3">City</th>
-                  <th className="text-left px-4 py-3">Country</th>
-                  <th className="text-left px-4 py-3">Host</th>
-                  <th className="text-left px-4 py-3">Status</th>
-                  <th className="text-left px-4 py-3">Created</th>
-                  <th className="text-left px-4 py-3"></th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {listings?.map((l) => (
-                  <tr key={l.id} className="border-t border-border">
-                    <td className="px-4 py-3 font-medium">{l.title}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{l.city}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{l.country}</td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {l.host_id.slice(0, 8)}...
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-orange-500 font-medium">Pending</span>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {new Date(l.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="px-4 py-3">
-                      <form action={approveListing.bind(null, l.id)}>
-                        <button className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-xs hover:opacity-90">
-                          Approve
-                        </button>
-                      </form>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
+      {/* Tab content */}
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        <Suspense
+          fallback={
+            <div className="py-20 text-center text-muted-foreground text-sm">
+              {t("loading")}
+            </div>
+          }
+        >
+          {activeTab === "overview" && <Overview />}
+          {activeTab === "bookings" && <Bookings status={params.status} />}
+          {activeTab === "users" && <Users />}
+          {activeTab === "listings" && <Listings status={params.status} />}
+          {activeTab === "applications" && <Applications />}
+          {activeTab === "reviews" && <Reviews />}
+        </Suspense>
       </div>
     </main>
   );
 }
 
-function MetricCard({ title, value }: { title: string; value: number }) {
-  return (
-    <div className="bg-card border border-border rounded-2xl p-6 space-y-1">
-      <p className="text-muted-foreground text-sm">{title}</p>
-      <p className="text-3xl font-semibold">{value}</p>
-    </div>
-  );
-}
-
-export default function Page() {
-  return (
-    <Suspense fallback={<div className="p-10">Loading dashboard...</div>}>
-      <AdminDashboard />
-    </Suspense>
-  );
+export default function Page({ searchParams }: { searchParams: SearchParams }) {
+  return <AdminPage searchParams={searchParams} />;
 }

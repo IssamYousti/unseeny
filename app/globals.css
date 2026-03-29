@@ -5,31 +5,31 @@
 @layer base {
   :root {
     /* BACKGROUND & TEXT */
-    --background: 210 40% 98%;            /* soft off-white */
-    --foreground: 222 47% 11%;
+    --background: 38 30% 97%;
+    --foreground: 240 30% 15%;
 
     /* CARDS */
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 240 30% 15%;
 
     /* POPOVER */
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 240 30% 15%;
 
-    /* PRIMARY (HiddenVillas blue) */
-    --primary: 207 90% 65%;
+    /* PRIMARY (Unseeny brand purple) */
+    --primary: 240 54% 37%;
     --primary-foreground: 0 0% 100%;
 
-    /* SECONDARY (soft background panels) */
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
+    /* SECONDARY (soft beige panels) */
+    --secondary: 38 20% 93%;
+    --secondary-foreground: 240 30% 15%;
 
-    /* MUTED TEXT */
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 20% 50%;
+    /* MUTED */
+    --muted: 38 15% 93%;
+    --muted-foreground: 240 12% 52%;
 
-    /* ACCENT (warm orange CTA) */
-    --accent: 24 95% 53%;
+    /* ACCENT (gold CTA) */
+    --accent: 43 80% 46%;
     --accent-foreground: 0 0% 100%;
 
     /* DESTRUCTIVE */
@@ -37,55 +37,55 @@
     --destructive-foreground: 0 0% 100%;
 
     /* BORDERS */
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 207 90% 65%;
+    --border: 38 20% 87%;
+    --input: 38 20% 87%;
+    --ring: 240 54% 37%;
 
     /* CHART COLORS */
-    --chart-1: 207 90% 65%;
-    --chart-2: 24 95% 53%;
-    --chart-3: 210 40% 50%;
-    --chart-4: 200 80% 70%;
-    --chart-5: 30 90% 60%;
+    --chart-1: 240 54% 37%;
+    --chart-2: 43 80% 46%;
+    --chart-3: 240 30% 55%;
+    --chart-4: 38 60% 60%;
+    --chart-5: 240 12% 52%;
 
-    /* RADIUS (more modern Airbnb feel) */
+    /* RADIUS */
     --radius: 1rem;
   }
 
   .dark {
-    --background: 222 47% 8%;
-    --foreground: 210 40% 96%;
+    --background: 240 30% 10%;
+    --foreground: 38 20% 93%;
 
-    --card: 222 47% 10%;
-    --card-foreground: 210 40% 96%;
+    --card: 240 25% 13%;
+    --card-foreground: 38 20% 93%;
 
-    --popover: 222 47% 10%;
-    --popover-foreground: 210 40% 96%;
+    --popover: 240 25% 13%;
+    --popover-foreground: 38 20% 93%;
 
-    --primary: 207 90% 70%;
-    --primary-foreground: 222 47% 10%;
+    --primary: 240 54% 62%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 222 30% 16%;
-    --secondary-foreground: 210 40% 96%;
+    --secondary: 240 20% 17%;
+    --secondary-foreground: 38 20% 93%;
 
-    --muted: 222 30% 16%;
-    --muted-foreground: 215 20% 70%;
+    --muted: 240 20% 17%;
+    --muted-foreground: 240 12% 62%;
 
-    --accent: 24 95% 60%;
-    --accent-foreground: 222 47% 10%;
+    --accent: 43 80% 55%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 62% 40%;
-    --destructive-foreground: 210 40% 96%;
+    --destructive-foreground: 38 20% 93%;
 
-    --border: 222 30% 18%;
-    --input: 222 30% 18%;
-    --ring: 207 90% 70%;
+    --border: 240 20% 20%;
+    --input: 240 20% 20%;
+    --ring: 240 54% 62%;
 
-    --chart-1: 207 90% 70%;
-    --chart-2: 24 95% 60%;
-    --chart-3: 210 40% 70%;
-    --chart-4: 200 80% 60%;
-    --chart-5: 30 90% 70%;
+    --chart-1: 240 54% 62%;
+    --chart-2: 43 80% 55%;
+    --chart-3: 240 30% 65%;
+    --chart-4: 38 60% 65%;
+    --chart-5: 240 12% 62%;
   }
 }
 
@@ -103,4 +103,80 @@
   .input {
     @apply w-full rounded-xl border border-input bg-background px-4 py-3 focus:outline-none focus:ring-2 focus:ring-ring;
   }
+}
+
+/* ── react-day-picker theme (scoped to .rdp-unseeny) ── */
+.rdp-unseeny {
+  --rdp-accent-color: hsl(var(--primary));
+  --rdp-accent-background-color: hsl(var(--primary) / 0.12);
+  --rdp-range-start-color: hsl(var(--primary-foreground));
+  --rdp-range-start-background: hsl(var(--primary));
+  --rdp-range-end-background: hsl(var(--primary));
+  --rdp-range-middle-background-color: hsl(var(--primary) / 0.12);
+  --rdp-disabled-opacity: 0.3;
+  --rdp-outside-opacity: 0.4;
+  --rdp-today-color: hsl(var(--primary));
+  font-size: 0.875rem;
+}
+
+.rdp-unseeny .rdp-root {
+  --rdp-font-family: inherit;
+  width: 100%;
+}
+
+.rdp-unseeny .rdp-months {
+  width: 100%;
+}
+
+.rdp-unseeny .rdp-month {
+  width: 100%;
+}
+
+.rdp-unseeny .rdp-month_grid {
+  width: 100%;
+}
+
+.rdp-unseeny .rdp-nav button {
+  @apply h-7 w-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition;
+}
+
+.rdp-unseeny .rdp-day_button {
+  @apply w-full h-8 rounded-lg text-sm transition hover:bg-muted;
+}
+
+.rdp-unseeny .rdp-selected .rdp-day_button,
+.rdp-unseeny .rdp-range_start .rdp-day_button,
+.rdp-unseeny .rdp-range_end .rdp-day_button {
+  @apply bg-primary text-primary-foreground hover:bg-primary hover:opacity-90;
+}
+
+.rdp-unseeny .rdp-range_middle .rdp-day_button {
+  background-color: hsl(var(--primary) / 0.12);
+  @apply text-foreground rounded-none hover:bg-primary/20;
+}
+
+.rdp-unseeny .rdp-range_start .rdp-day_button {
+  border-radius: 0.5rem 0 0 0.5rem;
+}
+
+.rdp-unseeny .rdp-range_end .rdp-day_button {
+  border-radius: 0 0.5rem 0.5rem 0;
+}
+
+.rdp-unseeny .rdp-range_start.rdp-range_end .rdp-day_button {
+  border-radius: 0.5rem;
+}
+
+.rdp-unseeny .rdp-disabled .rdp-day_button {
+  @apply opacity-30 cursor-not-allowed line-through pointer-events-none;
+}
+
+.rdp-unseeny .rdp-today:not(.rdp-selected) .rdp-day_button {
+  @apply font-bold text-primary;
+}
+
+.rdp-unseeny .rdp-weekday {
+  @apply text-xs font-medium text-muted-foreground pb-1;
+  width: calc(100% / 7);
+  text-align: center;
 }
