@@ -15,7 +15,7 @@ type HostRow = {
   responseRate: number | null;
 };
 
-function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function Stat({ label, value, sub }: { label?: string; value: string; sub?: string }) {
   return (
     <div className="text-right">
       <p className="text-sm font-semibold tabular-nums">{value}</p>
