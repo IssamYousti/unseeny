@@ -16,7 +16,7 @@ import { getTranslations } from "next-intl/server";
 import { Camera, CheckCircle, AlertTriangle, ShieldCheck, ClipboardList, RefreshCw } from "lucide-react";
 import { getPlatformConfig } from "@/lib/platform-config.server";
 
-async function EditListing(props: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string }> }) {
+async function EditListing(props: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string; saved?: string }> }) {
   const [params, search] = await Promise.all([props.params, props.searchParams]);
   const justCreated = search.created === "1";
   const justSaved = search.saved === "1";
@@ -276,7 +276,7 @@ async function EditListing(props: { params: Promise<{ id: string }>; searchParam
   );
 }
 
-export default function Page(props: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string }> }) {
+export default function Page(props: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string; saved?: string }> }) {
   return (
     <Suspense fallback={<div className="p-10 text-muted-foreground">Loading…</div>}>
       <EditListing params={props.params} searchParams={props.searchParams} />
