@@ -4,7 +4,19 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { sendMessage, markConversationRead } from "./actions";
 import { moderateMessage, getModerationMessage } from "@/lib/moderation";
-import { AlertCircle, ArrowLeft, Send } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  Send,
+  ExternalLink,
+  CalendarDays,
+  Users,
+  CheckCircle2,
+  Clock,
+  XCircle,
+  MinusCircle,
+  Home,
+} from "lucide-react";
 import Link from "next/link";
 
 type Message = {
@@ -13,6 +25,16 @@ type Message = {
   content: string;
   created_at: string;
 };
+
+type Booking = {
+  id: string;
+  status: string;
+  check_in: string;
+  check_out: string;
+  guests_count: number;
+  total_price: number;
+  created_at: string;
+} | null;
 
 type MessageGroup = {
   senderId: string;
@@ -49,26 +71,52 @@ function formatDateLabel(iso: string): string {
 }
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
-function getInitial(name: string) {
-  return name.charAt(0).toUpperCase();
+function formatShortDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+  });
 }
+
+const BOOKING_STATUS: Record<
+  string,
+  { label: string; cls: string; Icon: React.ElementType }
+> = {
+  pending:   { label: "Pending",   cls: "bg-amber-500/10 text-amber-600 border-amber-500/20",   Icon: Clock },
+  confirmed: { label: "Confirmed", cls: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20", Icon: CheckCircle2 },
+  rejected:  { label: "Declined",  cls: "bg-rose-500/10 text-rose-600 border-rose-500/20",      Icon: XCircle },
+  cancelled: { label: "Cancelled", cls: "bg-muted text-muted-foreground border-border",          Icon: MinusCircle },
+};
 
 export default function ChatClient({
   conversation,
   initialMessages,
   currentUserId,
   otherPartyName,
+  otherPartyId,
+  otherPartyRole,
+  profileHref,
   listingTitle,
+  listingId,
+  booking,
 }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   conversation: any;
   initialMessages: Message[];
   currentUserId: string;
   otherPartyName: string;
+  otherPartyId: string;
+  otherPartyRole: "host" | "guest";
+  profileHref: string;
   listingTitle: string | null;
+  listingId: string | null;
+  booking: Booking;
 }) {
   const supabase = createClient();
 
@@ -81,7 +129,7 @@ export default function ChatClient({
 
   useEffect(() => {
     markConversationRead(conversation.id);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation.id]);
 
   useEffect(() => {
@@ -100,7 +148,8 @@ export default function ChatClient({
             const incoming = payload.new as Message;
             if (prev.some((m) => m.id === incoming.id)) return prev;
             const tempIdx = prev.findIndex(
-              (m) => m.id.startsWith("temp-") && m.sender_id === incoming.sender_id,
+              (m) =>
+                m.id.startsWith("temp-") && m.sender_id === incoming.sender_id,
             );
             if (tempIdx !== -1) {
               const next = [...prev];
@@ -116,7 +165,9 @@ export default function ChatClient({
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [conversation.id, supabase]);
 
   useEffect(() => {
@@ -165,9 +216,8 @@ export default function ChatClient({
   }
 
   const groups = buildGroups(messages, currentUserId);
-  const initial = getInitial(otherPartyName);
+  const initial = otherPartyName.charAt(0).toUpperCase();
 
-  // Build list of [dateSeparator | group] entries
   type Entry =
     | { type: "separator"; label: string }
     | { type: "group"; group: MessageGroup };
@@ -177,48 +227,107 @@ export default function ChatClient({
   for (const group of groups) {
     const firstDate = toDateKey(group.messages[0].created_at);
     if (firstDate !== lastDate) {
-      entries.push({ type: "separator", label: formatDateLabel(group.messages[0].created_at) });
+      entries.push({
+        type: "separator",
+        label: formatDateLabel(group.messages[0].created_at),
+      });
       lastDate = firstDate;
     }
     entries.push({ type: "group", group });
   }
 
+  const bookingStatus = booking ? (BOOKING_STATUS[booking.status] ?? BOOKING_STATUS.pending) : null;
+
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
 
-      {/* ── Header ── */}
-      <div className="shrink-0 bg-background/95 backdrop-blur border-b border-border px-4 py-3 flex items-center gap-3">
-        <Link
-          href="/chats"
-          className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <div className="shrink-0 bg-background/95 backdrop-blur border-b border-border">
+        {/* Top bar: back + name + profile link */}
+        <div className="px-4 py-3 flex items-center gap-3">
+          <Link
+            href="/chats"
+            className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
 
-        <div className="h-9 w-9 rounded-full bg-primary/15 flex items-center justify-center text-sm font-semibold text-primary shrink-0 select-none">
-          {initial}
+          <div className="h-9 w-9 rounded-xl bg-primary/15 flex items-center justify-center text-sm font-bold text-primary shrink-0 select-none">
+            {initial}
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-sm font-bold leading-tight">{otherPartyName}</p>
+              <Link
+                href={profileHref}
+                className="flex items-center gap-1 text-xs text-primary hover:underline font-medium shrink-0"
+              >
+                <ExternalLink className="h-3 w-3" />
+                View {otherPartyRole} profile
+              </Link>
+            </div>
+            {listingTitle && (
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <Home className="h-3 w-3 text-muted-foreground shrink-0" />
+                {listingId ? (
+                  <Link
+                    href={`/listings/${listingId}`}
+                    className="text-xs text-muted-foreground hover:text-foreground hover:underline truncate"
+                  >
+                    {listingTitle}
+                  </Link>
+                ) : (
+                  <span className="text-xs text-muted-foreground truncate">{listingTitle}</span>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold leading-tight truncate">{otherPartyName}</p>
-          {listingTitle && (
-            <p className="text-xs text-muted-foreground truncate">{listingTitle}</p>
-          )}
-        </div>
+        {/* Booking context bar */}
+        {booking && bookingStatus && (
+          <div className="px-4 pb-3 flex items-center gap-3 flex-wrap">
+            <span
+              className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${bookingStatus.cls}`}
+            >
+              <bookingStatus.Icon className="h-3 w-3" />
+              {bookingStatus.label}
+            </span>
+
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <CalendarDays className="h-3 w-3 shrink-0" />
+              {formatShortDate(booking.check_in)} → {formatShortDate(booking.check_out)}
+            </div>
+
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Users className="h-3 w-3 shrink-0" />
+              {booking.guests_count} {booking.guests_count === 1 ? "guest" : "guests"}
+            </div>
+
+            <span className="text-xs font-semibold text-foreground ml-auto">
+              €{Number(booking.total_price).toLocaleString()}
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* ── Messages ── */}
+      {/* ── Messages ───────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-1">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
-            <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-xl font-semibold text-primary select-none">
+            <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center text-2xl font-bold text-primary select-none">
               {initial}
             </div>
             <div>
-              <p className="text-sm font-medium">{otherPartyName}</p>
-              {listingTitle && <p className="text-xs text-muted-foreground mt-0.5">{listingTitle}</p>}
+              <p className="text-sm font-semibold">{otherPartyName}</p>
+              {listingTitle && (
+                <p className="text-xs text-muted-foreground mt-0.5">{listingTitle}</p>
+              )}
             </div>
-            <p className="text-xs text-muted-foreground/60 mt-2">Send a message to start the conversation.</p>
+            <p className="text-xs text-muted-foreground/60 mt-2">
+              Send a message to start the conversation.
+            </p>
           </div>
         ) : (
           entries.map((entry, i) => {
@@ -240,9 +349,8 @@ export default function ChatClient({
                 key={`group-${i}`}
                 className={`flex flex-col gap-0.5 mb-3 ${group.isMe ? "items-end" : "items-start"}`}
               >
-                {/* Avatar for other party — shown above first bubble */}
                 {!group.isMe && (
-                  <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-[11px] font-semibold text-muted-foreground select-none mb-1 ml-1">
+                  <div className="h-6 w-6 rounded-lg bg-muted flex items-center justify-center text-[11px] font-bold text-muted-foreground select-none mb-1 ml-1">
                     {initial}
                   </div>
                 )}
@@ -252,7 +360,6 @@ export default function ChatClient({
                   const isLast = msgIdx === group.messages.length - 1;
                   const isTemp = msg.id.startsWith("temp-");
 
-                  // Bubble rounding: pill on single, asymmetric on grouped
                   let rounding = "";
                   if (group.isMe) {
                     if (group.messages.length === 1) rounding = "rounded-2xl rounded-br-md";
@@ -280,7 +387,6 @@ export default function ChatClient({
                   );
                 })}
 
-                {/* Timestamp below last message in group */}
                 <span className="text-[11px] text-muted-foreground/50 mt-0.5 px-1">
                   {formatTime(group.messages[group.messages.length - 1].created_at)}
                 </span>
@@ -291,7 +397,7 @@ export default function ChatClient({
         <div ref={bottomRef} />
       </div>
 
-      {/* ── Error banner ── */}
+      {/* ── Error banner ───────────────────────────────────────────────── */}
       {errorMsg && (
         <div className="shrink-0 mx-4 mb-2 flex items-start gap-2 bg-destructive/10 text-destructive text-sm rounded-xl px-4 py-2.5">
           <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
@@ -306,7 +412,7 @@ export default function ChatClient({
         </div>
       )}
 
-      {/* ── Input ── */}
+      {/* ── Input ──────────────────────────────────────────────────────── */}
       <div className="shrink-0 border-t border-border bg-background px-4 py-3">
         <form onSubmit={handleSend} className="flex items-end gap-2">
           <textarea
@@ -316,9 +422,9 @@ export default function ChatClient({
             onChange={(e) => {
               setText(e.target.value);
               if (errorMsg) setErrorMsg(null);
-              // auto-grow
               e.target.style.height = "auto";
-              e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
+              e.target.style.height =
+                Math.min(e.target.scrollHeight, 120) + "px";
             }}
             onKeyDown={handleKeyDown}
             placeholder="Type a message…"
@@ -337,7 +443,6 @@ export default function ChatClient({
           Enter to send · Shift+Enter for new line
         </p>
       </div>
-
     </div>
   );
 }

@@ -7,12 +7,14 @@ export function getListingImageUrl(storagePath: string): string {
 }
 
 export type ListingFilters = {
-  query?: string;       // searches title, city, country
-  guests?: number;      // minimum capacity required
-  maxPrice?: number;    // maximum price per night
-  checkIn?: string;     // ISO date — filter out unavailable listings
-  checkOut?: string;    // ISO date — filter out unavailable listings
-  amenities?: string[]; // listing must have ALL of these amenities
+  query?: string;          // legacy free-text: searches title, city, country
+  locationCity?: string;   // structured city filter (from geocode autocomplete)
+  locationCountry?: string; // structured country filter
+  guests?: number;         // minimum capacity required
+  maxPrice?: number;       // maximum price per night
+  checkIn?: string;        // ISO date — filter out unavailable listings
+  checkOut?: string;       // ISO date — filter out unavailable listings
+  amenities?: string[];    // listing must have ALL of these amenities
 };
 
 export async function getApprovedListings(filters: ListingFilters = {}) {
@@ -24,10 +26,16 @@ export async function getApprovedListings(filters: ListingFilters = {}) {
     .from("listings")
     .select("*")
     .eq("is_approved", true)
+    .eq("is_archived", false)
     .order("created_at", { ascending: false });
 
-  // Text search across title, city, country
-  if (filters.query && filters.query.trim()) {
+  // Structured location filter (preferred — from geocode autocomplete)
+  if (filters.locationCity) {
+    query = query.ilike("city", `%${filters.locationCity}%`);
+  } else if (filters.locationCountry) {
+    query = query.ilike("country", `%${filters.locationCountry}%`);
+  } else if (filters.query && filters.query.trim()) {
+    // Fallback: legacy free-text search across title, city, country
     const q = filters.query.trim();
     query = query.or(`title.ilike.%${q}%,city.ilike.%${q}%,country.ilike.%${q}%`);
   }

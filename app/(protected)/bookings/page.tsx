@@ -2,9 +2,11 @@ import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { getTranslations } from "next-intl/server";
 import Link from "next/link";
-import { CalendarDays, Users, MessageSquare, X, CreditCard } from "lucide-react";
+import { CalendarDays, Users, MessageSquare, CreditCard } from "lucide-react";
 import ReviewForm from "@/components/ReviewForm";
-import { cancelBooking, initiatePayment } from "./actions";
+import CancelBookingButton, { type RefundPreview } from "@/components/CancelBookingButton";
+import { initiatePayment } from "./actions";
+import { calculateRefund, type PolicyType } from "@/lib/cancellation";
 
 type Booking = {
   id: string;
@@ -14,7 +16,19 @@ type Booking = {
   total_price: number;
   status: string;
   conversation_id: string | null;
+  listing_id: string;
+  stripe_session_id: string | null;
   listings: { id: string; title: string; city: string; country: string } | null;
+};
+
+type PolicyRow = {
+  listing_id: string;
+  policy_type: string;
+  full_refund_days_before: number;
+  partial_refund_days_before: number;
+  partial_refund_percentage: number;
+  cutoff_hour: number;
+  timezone: string;
 };
 
 const STATUS_STYLES: Record<string, string> = {
@@ -50,6 +64,23 @@ async function GuestBookings() {
 
   const reviewedBookingIds = new Set((myReviews ?? []).map((r) => r.booking_id));
 
+  // Fetch cancellation policies for all listings that have cancellable confirmed bookings
+  const confirmedBookings = (bookings ?? []).filter(
+    (b) => b.status === "confirmed" && b.stripe_session_id,
+  ) as Booking[];
+  const listingIds = [...new Set(confirmedBookings.map((b) => b.listing_id))];
+
+  const policies = new Map<string, PolicyRow>();
+  if (listingIds.length > 0) {
+    const { data: policyRows } = await supabase
+      .from("listing_cancellation_policy")
+      .select("listing_id, policy_type, full_refund_days_before, partial_refund_days_before, partial_refund_percentage, cutoff_hour, timezone")
+      .in("listing_id", listingIds);
+    for (const row of policyRows ?? []) {
+      policies.set(row.listing_id, row as PolicyRow);
+    }
+  }
+
   const reviewLabels = {
     title: t("review_title"),
     placeholder: t("review_placeholder"),
@@ -80,8 +111,38 @@ async function GuestBookings() {
               const n = nights(b.check_in, b.check_out);
               const isPast = b.check_out < today;
               const canReview = b.status === "confirmed" && isPast && !reviewedBookingIds.has(b.id);
-              const canCancel = b.status === "pending";
+              const canCancel = ["pending", "approved", "confirmed"].includes(b.status) && !isPast;
               const needsPayment = b.status === "approved";
+
+              // Compute refund preview for confirmed bookings
+              let refundPreview: RefundPreview | null = null;
+              if (b.status === "confirmed" && b.stripe_session_id) {
+                const policy = policies.get(b.listing_id);
+                if (policy) {
+                  const result = calculateRefund(Number(b.total_price), b.check_in, new Date(), {
+                    policy_type: policy.policy_type as PolicyType,
+                    full_refund_days_before: policy.full_refund_days_before,
+                    partial_refund_days_before: policy.partial_refund_days_before,
+                    partial_refund_percentage: policy.partial_refund_percentage,
+                    cutoff_hour: policy.cutoff_hour,
+                    timezone: policy.timezone,
+                  });
+                  refundPreview = {
+                    tier: result.tier,
+                    percentage: result.percentage,
+                    amount: result.amount,
+                    explanation: result.explanation,
+                  };
+                } else {
+                  // Default: full refund if no policy configured
+                  refundPreview = {
+                    tier: "full",
+                    percentage: 100,
+                    amount: Number(b.total_price),
+                    explanation: "Full refund — no specific policy set by host.",
+                  };
+                }
+              }
 
               return (
                 <div key={b.id} className="bg-card border border-border rounded-xl p-5 space-y-4">
@@ -131,12 +192,11 @@ async function GuestBookings() {
                     )}
 
                     {canCancel && (
-                      <form action={cancelBooking.bind(null, b.id)}>
-                        <button className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-destructive transition">
-                          <X className="h-3.5 w-3.5" />
-                          {t("cancel")}
-                        </button>
-                      </form>
+                      <CancelBookingButton
+                        bookingId={b.id}
+                        totalPrice={Number(b.total_price)}
+                        refundPreview={refundPreview}
+                      />
                     )}
                   </div>
 

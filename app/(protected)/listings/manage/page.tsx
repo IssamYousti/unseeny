@@ -1,38 +1,26 @@
 import { createOrUpdateListing } from "../actions";
+import { createClient } from "@/lib/supabase/server";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
-import { ImageIcon } from "lucide-react";
 import { getTranslations } from "next-intl/server";
-import AmenitiesPicker from "@/components/AmenitiesPicker";
+import EquipmentPicker from "@/components/EquipmentPicker";
+import RichTextEditor from "@/components/RichTextEditor";
 
 export default async function CreateListingPage() {
-  const [t, ta] = await Promise.all([
+  const [t, supabase] = await Promise.all([
     getTranslations("manage"),
-    getTranslations("amenities"),
+    createClient(),
   ]);
 
-  const amenityLabels = {
-    section_title: ta("section_title"),
-    private_pool: ta("private_pool"),
-    private_garden: ta("private_garden"),
-    ac: ta("ac"),
-    wifi: ta("wifi"),
-    parking: ta("parking"),
-    bbq: ta("bbq"),
-    kitchen: ta("kitchen"),
-    outdoor_dining: ta("outdoor_dining"),
-    washing_machine: ta("washing_machine"),
-    baby_cot: ta("baby_cot"),
-    no_cameras: ta("no_cameras"),
-    prayer_room: ta("prayer_room"),
-    halal_kitchen: ta("halal_kitchen"),
-    gym: ta("gym"),
-    sauna: ta("sauna"),
-    ev_charger: ta("ev_charger"),
-  };
+  // Load equipment items from DB
+  const { data: equipmentItems } = await supabase
+    .from("equipment_items")
+    .select("*")
+    .eq("is_active", true)
+    .order("category")
+    .order("sort_order");
 
   return (
     <main className="bg-background min-h-screen">
@@ -41,11 +29,6 @@ export default async function CreateListingPage() {
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">{t("create_title")}</h1>
           <p className="text-muted-foreground mt-1">{t("create_desc")}</p>
-        </div>
-
-        <div className="flex items-start gap-3 bg-secondary/60 border border-border rounded-2xl px-5 py-4">
-          <ImageIcon className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-muted-foreground">{t("photos_note")}</p>
         </div>
 
         <form action={createOrUpdateListing} className="space-y-6">
@@ -59,7 +42,7 @@ export default async function CreateListingPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="descr">{t("label_description")}</Label>
-                <Textarea id="descr" name="descr" placeholder={t("placeholder_desc")} rows={5} className="resize-none" />
+                <RichTextEditor name="descr" placeholder={t("placeholder_desc")} />
               </div>
             </CardContent>
           </Card>
@@ -90,9 +73,9 @@ export default async function CreateListingPage() {
           </Card>
 
           <Card>
-            <CardHeader><CardTitle className="text-base">{amenityLabels.section_title}</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-base">Equipment</CardTitle></CardHeader>
             <CardContent>
-              <AmenitiesPicker labels={amenityLabels} />
+              <EquipmentPicker items={equipmentItems ?? []} />
             </CardContent>
           </Card>
 
@@ -108,6 +91,10 @@ export default async function CreateListingPage() {
               </div>
             </CardContent>
           </Card>
+
+          <p className="text-sm text-muted-foreground">
+            After saving, you&apos;ll be taken to the listing page where you can upload photos.
+          </p>
 
           <Button type="submit" className="w-full sm:w-auto">{t("create_submit")}</Button>
         </form>

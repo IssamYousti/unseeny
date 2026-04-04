@@ -3,7 +3,7 @@
 import { useState, useActionState } from "react";
 import { createBooking } from "@/app/(protected)/listings/[id]/actions";
 import { DayPicker, type DateRange } from "react-day-picker";
-import { Users, AlertCircle, CalendarOff, ChevronLeft, ChevronRight } from "lucide-react";
+import { Users, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import "react-day-picker/style.css";
 
 type UnavailablePeriod = { start: string; end: string };
@@ -24,7 +24,6 @@ type Props = {
     total: string;
     selectDates: string;
     guestOf: string;
-    unavailable_title: string;
   };
 };
 
@@ -94,6 +93,22 @@ export default function BookingWidget({ listingId, pricePerNight, maxGuests, una
 
           {/* Day picker */}
           <div className="p-3 rdp-unseeny">
+            <style>{`
+              .rdp-unseeny .rdp-day_button:disabled,
+              .rdp-unseeny [aria-disabled="true"] .rdp-day_button {
+                text-decoration: line-through;
+                opacity: 0.35;
+                color: inherit;
+              }
+              .rdp-unseeny [data-disabled="true"] {
+                text-decoration: line-through;
+                opacity: 0.35;
+              }
+              .rdp-unseeny .rdp-day[data-disabled] .rdp-day_button {
+                text-decoration: line-through;
+                opacity: 0.35;
+              }
+            `}</style>
             <DayPicker
               mode="range"
               selected={range}
@@ -109,23 +124,6 @@ export default function BookingWidget({ listingId, pricePerNight, maxGuests, una
             />
           </div>
         </div>
-
-        {/* Unavailable periods legend */}
-        {unavailablePeriods.filter((p) => p.end >= today.toISOString().split("T")[0]).length > 0 && (
-          <div className="bg-muted/50 rounded-xl px-3 py-2.5 space-y-1.5">
-            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-              <CalendarOff className="h-3 w-3" />
-              {labels.unavailable_title}
-            </p>
-            <ul className="space-y-0.5">
-              {unavailablePeriods
-                .filter((p) => p.end >= today.toISOString().split("T")[0])
-                .map((p, i) => (
-                  <li key={i} className="text-xs text-muted-foreground">{p.start} → {p.end}</li>
-                ))}
-            </ul>
-          </div>
-        )}
 
         {/* Guests */}
         <div className="space-y-1.5">

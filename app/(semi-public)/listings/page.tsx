@@ -1,13 +1,18 @@
 import { Suspense } from "react";
 import ListingCard from "@/components/ListingCard";
-import SearchFilters from "@/components/SearchFilters";
+import SearchFilters, { type AmenityFilterItem } from "@/components/SearchFilters";
 import NotifyBanner from "@/components/NotifyBanner";
+import ListingsMap from "@/components/ListingsMap";
+import type { MapListing } from "@/components/ListingsMap";
 import { getApprovedListings, type ListingFilters } from "@/lib/data/listings";
 import { createClient } from "@/lib/supabase/server";
 import { Lock, Eye, Shield } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
 type SearchParams = {
+  location?: string;
+  locationCity?: string;
+  locationCountry?: string;
   q?: string;
   guests?: string;
   maxPrice?: string;
@@ -18,10 +23,13 @@ type SearchParams = {
 
 async function ListingsLoader({ searchParams }: { searchParams: SearchParams }) {
   const supabase = await createClient();
-  const userEmail = (await supabase.auth.getUser()).data.user?.email ?? undefined;
+  const authUser = (await supabase.auth.getUser()).data.user;
+  const userEmail = authUser?.email ?? undefined;
 
-  const [listings, t, ta, subscriptionCheck] = await Promise.all([
+  const [listings, t, subscriptionCheck, favouritesResult, equipmentResult] = await Promise.all([
     getApprovedListings({
+      locationCity: searchParams.locationCity,
+      locationCountry: searchParams.locationCountry,
       query: searchParams.q,
       guests: searchParams.guests ? Number(searchParams.guests) : undefined,
       maxPrice: searchParams.maxPrice ? Number(searchParams.maxPrice) : undefined,
@@ -30,15 +38,28 @@ async function ListingsLoader({ searchParams }: { searchParams: SearchParams }) 
       amenities: searchParams.amenities?.split(",").filter(Boolean),
     } satisfies ListingFilters),
     getTranslations("listings"),
-    getTranslations("amenities"),
     userEmail
       ? supabase.from("listing_notifications").select("email").eq("email", userEmail).maybeSingle()
       : Promise.resolve({ data: null }),
+    authUser
+      ? supabase.from("listing_favourites").select("listing_id").eq("user_id", authUser.id)
+      : Promise.resolve({ data: null }),
+    // Fetch top amenities for filter chips — sorted by display_order (most relevant first)
+    supabase
+      .from("equipment_items")
+      .select("key, name_en, category")
+      .eq("is_active", true)
+      .lte("display_order", 15)
+      .order("display_order", { ascending: true }),
   ]);
 
+  const favouriteIds = new Set((favouritesResult.data ?? []).map((f) => f.listing_id));
   const isSubscribed = !!subscriptionCheck.data;
 
   const hasActiveFilters =
+    searchParams.location ||
+    searchParams.locationCity ||
+    searchParams.locationCountry ||
     searchParams.q ||
     searchParams.guests ||
     searchParams.maxPrice ||
@@ -46,8 +67,31 @@ async function ListingsLoader({ searchParams }: { searchParams: SearchParams }) 
     searchParams.checkOut ||
     searchParams.amenities;
 
+  // Listings that have geocoordinates — shown on map
+  const mapListings: MapListing[] = listings
+    .filter((l) => l.latitude != null && l.longitude != null)
+    .map((l) => ({
+      id: l.id,
+      title: l.title,
+      city: l.city,
+      country: l.country,
+      price_per_night: l.price_per_night,
+      latitude: l.latitude as number,
+      longitude: l.longitude as number,
+      cover_image_url: l.cover_image_url ?? null,
+      avg_rating: l.avg_rating ?? null,
+      review_count: l.review_count ?? 0,
+    }));
+
+  const amenityItems: AmenityFilterItem[] = (equipmentResult.data ?? []).map((e) => ({
+    key: e.key,
+    name_en: e.name_en,
+    category: e.category,
+  }));
+
   const filterLabels = {
     placeholder: t("filter_placeholder"),
+    location: t("filter_location"),
     guests: t("filter_guests"),
     max_price: t("filter_max_price"),
     check_in: t("filter_check_in"),
@@ -55,32 +99,20 @@ async function ListingsLoader({ searchParams }: { searchParams: SearchParams }) 
     search: t("filter_search"),
     clear: t("filter_clear"),
     amenities: t("filter_amenities"),
-    amenity_labels: {
-      private_pool: ta("private_pool"),
-      wifi: ta("wifi"),
-      parking: ta("parking"),
-      prayer_room: ta("prayer_room"),
-      halal_kitchen: ta("halal_kitchen"),
-      no_cameras: ta("no_cameras"),
-      bbq: ta("bbq"),
-      ac: ta("ac"),
-    },
   };
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="bg-background min-h-screen">
 
       {/* HERO */}
       <section className="border-b border-border bg-secondary/40">
-        <div className="max-w-6xl mx-auto px-6 py-16">
+        <div className="max-w-4xl mx-auto px-6 py-14">
           <h1 className="text-4xl md:text-5xl font-semibold tracking-tight max-w-2xl">
             {t("headline")}
           </h1>
-
           <p className="text-muted-foreground mt-4 max-w-xl text-lg">
             {t("description")}
           </p>
-
           <div className="flex flex-wrap gap-3 mt-6">
             <span className="flex items-center gap-1.5 text-xs font-medium bg-primary/10 text-primary px-3 py-1.5 rounded-full border border-primary/20">
               <Lock className="h-3 w-3" /> {t("badge_pool")}
@@ -96,12 +128,21 @@ async function ListingsLoader({ searchParams }: { searchParams: SearchParams }) 
       </section>
 
       {/* SEARCH FILTERS */}
-      <section className="max-w-6xl mx-auto px-6 pt-8">
-        <SearchFilters labels={filterLabels} />
+      <section className="max-w-4xl mx-auto px-6 pt-8">
+        <SearchFilters labels={filterLabels} amenityItems={amenityItems} />
       </section>
 
+      {/* MAP — inline card, only when there are geocoded listings */}
+      {mapListings.length > 0 && (
+        <section className="max-w-4xl mx-auto px-6 pt-6">
+          <div className="h-64 sm:h-80 rounded-2xl overflow-hidden border border-border shadow-sm">
+            <ListingsMap listings={mapListings} />
+          </div>
+        </section>
+      )}
+
       {/* RESULTS */}
-      <section className="max-w-6xl mx-auto px-6 py-8">
+      <section className="max-w-4xl mx-auto px-6 py-8">
         {listings.length === 0 ? (
           <div className="text-center py-20">
             <h3 className="text-xl font-semibold">
@@ -119,9 +160,13 @@ async function ListingsLoader({ searchParams }: { searchParams: SearchParams }) 
                 {listings.length === 1 ? t("result_single") : t("result_plural")}
               </p>
             )}
-            <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
               {listings.map((listing) => (
-                <ListingCard key={listing.id} listing={listing} />
+                <ListingCard
+                  key={listing.id}
+                  listing={listing}
+                  isFavourite={authUser ? favouriteIds.has(listing.id) : undefined}
+                />
               ))}
             </div>
           </>
@@ -129,7 +174,7 @@ async function ListingsLoader({ searchParams }: { searchParams: SearchParams }) 
       </section>
 
       {/* NOTIFY BANNER */}
-      <section className="max-w-6xl mx-auto px-6 pb-16">
+      <section className="max-w-4xl mx-auto px-6 pb-16">
         <NotifyBanner defaultEmail={userEmail} isSubscribed={isSubscribed} />
       </section>
 

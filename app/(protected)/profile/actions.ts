@@ -16,6 +16,15 @@ export async function updateProfile(
   const first_name = formData.get("first_name") as string;
   const last_name = formData.get("last_name") as string;
   const dob = formData.get("dob") as string | null;
+  const host_bio = (formData.get("host_bio") as string | null)?.trim() || null;
+  const hosting_since = (formData.get("hosting_since") as string | null) || null;
+
+  // Parse languages: comma-separated string → trimmed array
+  const languagesRaw = (formData.get("languages") as string | null) ?? "";
+  const languages = languagesRaw
+    .split(",")
+    .map((l) => l.trim())
+    .filter(Boolean);
 
   const { error } = await supabase
     .from("profiles")
@@ -24,6 +33,9 @@ export async function updateProfile(
       first_name,
       last_name,
       dob: dob || null,
+      host_bio,
+      hosting_since: hosting_since || null,
+      languages,
       updated_at: new Date().toISOString(),
     })
     .eq("id", user.id);

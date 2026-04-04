@@ -72,38 +72,87 @@ export async function approveListing(listingId: string) {
     // Non-fatal — listing is still approved even if email fails
   }
 
-  // Email notification subscribers
+  // Email notification subscribers — filtered by each subscriber's preferences
   try {
     const admin = createAdminClient();
+
+    // Fetch full listing detail for matching
+    const { data: listingDetail } = await admin
+      .from("listings")
+      .select("city, country, price_per_night, max_guests, amenities")
+      .eq("id", listingId)
+      .single();
+
+    // Fetch all active subscribers with their preferences
     const { data: subs } = await admin
       .from("listing_notifications")
-      .select("email");
-    if (subs && subs.length > 0) {
-      const { data: listingDetail } = await admin
-        .from("listings")
-        .select("city, country")
-        .eq("id", listingId)
-        .single();
-      await sendNewListingNotification(
-        subs.map((s) => s.email),
-        listing.title,
-        listingId,
-        listingDetail?.city ?? null,
-        listingDetail?.country ?? null,
-      );
+      .select("email, countries, cities, max_price, min_guests, amenities, is_active")
+      .eq("is_active", true);
+
+    if (subs && subs.length > 0 && listingDetail) {
+      const lCountry = (listingDetail.country ?? "").toLowerCase();
+      const lCity = (listingDetail.city ?? "").toLowerCase();
+      const lPrice = Number(listingDetail.price_per_night ?? 0);
+      const lGuests = Number(listingDetail.max_guests ?? 0);
+      const lAmenities: string[] = listingDetail.amenities ?? [];
+
+      const matchedEmails = subs
+        .filter((s) => {
+          // Country filter: if list non-empty, listing country must be in it
+          if (s.countries?.length > 0) {
+            const match = s.countries.some(
+              (c: string) => c.toLowerCase() === lCountry,
+            );
+            if (!match) return false;
+          }
+          // City filter
+          if (s.cities?.length > 0) {
+            const match = s.cities.some(
+              (c: string) => c.toLowerCase() === lCity,
+            );
+            if (!match) return false;
+          }
+          // Max price
+          if (s.max_price != null && lPrice > Number(s.max_price)) return false;
+          // Min guests capacity
+          if (s.min_guests != null && lGuests < Number(s.min_guests)) return false;
+          // Amenities: listing must have at least one of the required amenities
+          if (s.amenities?.length > 0) {
+            const hasAny = s.amenities.some((a: string) => lAmenities.includes(a));
+            if (!hasAny) return false;
+          }
+          return true;
+        })
+        .map((s) => s.email as string)
+        .filter(Boolean);
+
+      if (matchedEmails.length > 0) {
+        await sendNewListingNotification(
+          matchedEmails,
+          listing.title,
+          listingId,
+          listingDetail.city ?? null,
+          listingDetail.country ?? null,
+        );
+      }
     }
   } catch {
     // Non-fatal
   }
 }
 
-export async function rejectListing(listingId: string) {
+export async function rejectListing(listingId: string, reason?: string) {
   const supabase = await createClient();
   await assertAdmin(supabase);
 
   const { error } = await supabase
     .from("listings")
-    .update({ is_approved: false, updated_at: new Date().toISOString() })
+    .update({
+      is_approved: false,
+      is_rejected: true,
+      rejection_reason: reason ?? null,
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", listingId);
 
   if (error) throw new Error(error.message);
@@ -205,6 +254,138 @@ export async function adminDeleteReview(reviewId: string, type: "listing" | "gue
 
   const { error } = await supabase.from(table).delete().eq("id", reviewId);
 
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/admin");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Equipment management
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function adminToggleEquipment(itemId: string, isActive: boolean) {
+  const supabase = await createClient();
+  await assertAdmin(supabase);
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("equipment_items")
+    .update({ is_active: isActive })
+    .eq("id", itemId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/admin");
+}
+
+export async function adminAddEquipment(formData: FormData) {
+  const supabase = await createClient();
+  await assertAdmin(supabase);
+
+  const key = (formData.get("key") as string)?.trim().toLowerCase().replace(/\s+/g, "_");
+  const category = formData.get("category") as string;
+  const name_en = (formData.get("name_en") as string)?.trim();
+  const name_nl = (formData.get("name_nl") as string)?.trim() || name_en;
+  const name_fr = (formData.get("name_fr") as string)?.trim() || name_en;
+
+  if (!key || !category || !name_en) throw new Error("Missing required fields");
+
+  const admin = createAdminClient();
+  const { error } = await admin.from("equipment_items").insert({
+    key,
+    category,
+    name_en,
+    name_nl,
+    name_fr,
+  });
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/admin");
+}
+
+export async function adminDeleteEquipment(itemId: string) {
+  const supabase = await createClient();
+  await assertAdmin(supabase);
+
+  const admin = createAdminClient();
+  const { error } = await admin.from("equipment_items").delete().eq("id", itemId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/admin");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Chat moderation — blacklist management
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function adminAddBlacklistItem(formData: FormData) {
+  const supabase = await createClient();
+  await assertAdmin(supabase);
+
+  const type = formData.get("type") as string;
+  const value = (formData.get("value") as string)?.trim();
+  const description = (formData.get("description") as string)?.trim() || null;
+
+  if (!type || !value) throw new Error("Type and value are required");
+
+  const admin = createAdminClient();
+  const { error } = await admin.from("chat_blacklist").insert({ type, value, description });
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/admin");
+}
+
+export async function adminToggleBlacklistItem(itemId: string, isActive: boolean) {
+  const supabase = await createClient();
+  await assertAdmin(supabase);
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("chat_blacklist")
+    .update({ is_active: isActive })
+    .eq("id", itemId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/admin");
+}
+
+export async function adminDeleteBlacklistItem(itemId: string) {
+  const supabase = await createClient();
+  await assertAdmin(supabase);
+
+  const admin = createAdminClient();
+  const { error } = await admin.from("chat_blacklist").delete().eq("id", itemId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/admin");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Chat moderation — violation review
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function adminReviewViolation(
+  violationId: string,
+  action: "dismissed" | "warned",
+) {
+  const supabase = await createClient();
+  await assertAdmin(supabase);
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("chat_violations")
+    .update({
+      is_reviewed: true,
+      reviewed_at: new Date().toISOString(),
+      reviewed_by: user.id,
+      review_action: action,
+    })
+    .eq("id", violationId);
   if (error) throw new Error(error.message);
 
   revalidatePath("/admin");

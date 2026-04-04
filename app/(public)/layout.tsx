@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Navbar from "@/components/Navigationbar";
+import Footer from "@/components/Footer";
 
 export default async function PublicLayout({
   children,
@@ -18,9 +19,10 @@ export default async function PublicLayout({
   }
 
   return (
-    <>
+    <div className="min-h-screen bg-background flex flex-col">
       <Navbar authenticated={false} />
-      {children}
-    </>
+      <div className="flex-1">{children}</div>
+      <Footer />
+    </div>
   );
 }

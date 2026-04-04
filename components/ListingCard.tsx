@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Lock, Star } from "lucide-react";
 import { getTranslations } from "next-intl/server";
+import FavouriteButton from "@/components/FavouriteButton";
 
 type Props = {
   listing: {
@@ -13,9 +14,11 @@ type Props = {
     avg_rating?: number | null;
     review_count?: number;
   };
+  /** Pass `true`/`false` only when user is logged in — omit for guests */
+  isFavourite?: boolean;
 };
 
-export default async function ListingCard({ listing }: Props) {
+export default async function ListingCard({ listing, isFavourite }: Props) {
   const t = await getTranslations("listingCard");
 
   return (
@@ -39,10 +42,18 @@ export default async function ListingCard({ listing }: Props) {
           </div>
         )}
 
+        {/* Private badge */}
         <div className="absolute top-3 left-3 flex items-center gap-1 bg-background/80 backdrop-blur-sm border border-border rounded-full px-2.5 py-1">
           <Lock className="h-3 w-3 text-primary" />
           <span className="text-[11px] font-medium">{t("private")}</span>
         </div>
+
+        {/* Favourite button — only shown to logged-in users */}
+        {isFavourite !== undefined && (
+          <div className="absolute top-3 right-3">
+            <FavouriteButton listingId={listing.id} initialFavourite={isFavourite} />
+          </div>
+        )}
       </div>
 
       {/* Content */}

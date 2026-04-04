@@ -1,29 +1,37 @@
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { createOrUpdateListing, deleteListing } from "../../actions";
+import { createOrUpdateListing, deleteListing, archiveListing } from "../../actions";
 import ListingImageUpload from "@/components/ListingImageUpload";
-import AmenitiesPicker from "@/components/AmenitiesPicker";
+import EquipmentPicker from "@/components/EquipmentPicker";
 import AvailabilityManager from "@/components/AvailabilityManager";
+import RichTextEditor from "@/components/RichTextEditor";
+import CancellationPolicyForm from "@/components/CancellationPolicyForm";
+import PropertyRulesForm from "@/components/PropertyRulesForm";
+import PricingInput from "@/components/PricingInput";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
 import { getTranslations } from "next-intl/server";
+import { Camera, CheckCircle, AlertTriangle, ShieldCheck, ClipboardList, RefreshCw } from "lucide-react";
+import { getPlatformConfig } from "@/lib/platform-config.server";
 
-async function EditListing(props: { params: Promise<{ id: string }> }) {
-  const params = await props.params;
+async function EditListing(props: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string }> }) {
+  const [params, search] = await Promise.all([props.params, props.searchParams]);
+  const justCreated = search.created === "1";
+  const justSaved = search.saved === "1";
 
-  const [supabase, t, ta] = await Promise.all([
+  const [supabase, t] = await Promise.all([
     createClient(),
     getTranslations("manage"),
-    getTranslations("amenities"),
   ]);
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const [{ data }, { data: imageRows }, { data: blockedPeriods }] = await Promise.all([
+  const [platformConfig, [{ data }, { data: imageRows }, { data: blockedPeriods }, { data: equipmentItems }, { data: cancellationPolicy }, { data: propertyRules }]] = await Promise.all([
+    getPlatformConfig(),
+    Promise.all([
     supabase.from("listings").select("*").eq("id", params.id).single(),
     supabase
       .from("listing_images")
@@ -35,31 +43,28 @@ async function EditListing(props: { params: Promise<{ id: string }> }) {
       .select("id, start_date, end_date")
       .eq("listing_id", params.id)
       .order("start_date", { ascending: true }),
+    supabase
+      .from("equipment_items")
+      .select("*")
+      .eq("is_active", true)
+      .order("category")
+      .order("sort_order"),
+    supabase
+      .from("listing_cancellation_policy")
+      .select("*")
+      .eq("listing_id", params.id)
+      .maybeSingle(),
+    supabase
+      .from("listing_rules")
+      .select("*")
+      .eq("listing_id", params.id)
+      .maybeSingle(),
+  ]),
   ]);
 
   if (!data) return <p className="p-10">{t("loading")}</p>;
 
   const existingImages = imageRows ?? [];
-
-  const amenityLabels = {
-    section_title: ta("section_title"),
-    private_pool: ta("private_pool"),
-    private_garden: ta("private_garden"),
-    ac: ta("ac"),
-    wifi: ta("wifi"),
-    parking: ta("parking"),
-    bbq: ta("bbq"),
-    kitchen: ta("kitchen"),
-    outdoor_dining: ta("outdoor_dining"),
-    washing_machine: ta("washing_machine"),
-    baby_cot: ta("baby_cot"),
-    no_cameras: ta("no_cameras"),
-    prayer_room: ta("prayer_room"),
-    halal_kitchen: ta("halal_kitchen"),
-    gym: ta("gym"),
-    sauna: ta("sauna"),
-    ev_charger: ta("ev_charger"),
-  };
 
   const availabilityLabels = {
     title: t("availability_title"),
@@ -71,6 +76,8 @@ async function EditListing(props: { params: Promise<{ id: string }> }) {
     error_dates: t("availability_error_dates"),
   };
 
+  const isHtml = data.descr?.startsWith("<");
+
   return (
     <main className="bg-background min-h-screen">
       <div className="max-w-3xl mx-auto px-6 py-12 space-y-8">
@@ -80,8 +87,54 @@ async function EditListing(props: { params: Promise<{ id: string }> }) {
           <p className="text-muted-foreground mt-1">{data.title} — {data.city}, {data.country}</p>
         </div>
 
-        <Card>
-          <CardHeader><CardTitle className="text-base">{t("photos_section")}</CardTitle></CardHeader>
+        {/* Pending review banner (after edit) */}
+        {justSaved && (
+          <div className="flex items-start gap-3 bg-amber-500/5 border border-amber-500/20 rounded-2xl px-5 py-4">
+            <RefreshCw className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-amber-700 dark:text-amber-400">Changes saved — pending admin review</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Your listing has been updated and sent for re-approval. It will be visible to guests once approved.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* "Just created" welcome banner */}
+        {justCreated && (
+          <div className="flex items-start gap-3 bg-primary/5 border border-primary/20 rounded-2xl px-5 py-4">
+            <CheckCircle className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium">Listing created! Now add photos.</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Upload clear photos that show the full private setup — pool, garden, and exterior fences help with approval.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Rejection reason (shown if listing was rejected) */}
+        {data.is_rejected && data.rejection_reason && (
+          <div className="flex items-start gap-3 bg-red-500/5 border border-red-500/20 rounded-2xl px-5 py-4">
+            <AlertTriangle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-red-600 dark:text-red-400">Your listing was rejected</p>
+              <p className="text-sm text-muted-foreground mt-1">{data.rejection_reason}</p>
+              <p className="text-xs text-muted-foreground/70 mt-2">
+                Please make the necessary changes and re-submit for review.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Photos */}
+        <Card className={justCreated ? "ring-2 ring-primary/30" : ""}>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Camera className="h-4 w-4" />
+              {t("photos_section")}
+            </CardTitle>
+          </CardHeader>
           <CardContent>
             <ListingImageUpload listingId={data.id} userId={user.id} existingImages={existingImages} />
           </CardContent>
@@ -99,7 +152,17 @@ async function EditListing(props: { params: Promise<{ id: string }> }) {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="descr">{t("label_description")}</Label>
-                <Textarea id="descr" name="descr" defaultValue={data.descr || ""} rows={5} className="resize-none" placeholder={t("placeholder_desc")} />
+                <RichTextEditor
+                  name="descr"
+                  defaultValue={isHtml ? data.descr : undefined}
+                  placeholder={t("placeholder_desc")}
+                />
+                {/* If descr is plain text, pre-fill as plain text in the editor via a separate hidden note */}
+                {!isHtml && data.descr && (
+                  <p className="text-xs text-muted-foreground">
+                    Your current description is in plain text. Start editing to convert it to rich text.
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -130,22 +193,20 @@ async function EditListing(props: { params: Promise<{ id: string }> }) {
           </Card>
 
           <Card>
-            <CardHeader><CardTitle className="text-base">{amenityLabels.section_title}</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-base">Equipment</CardTitle></CardHeader>
             <CardContent>
-              <AmenitiesPicker selected={data.amenities ?? []} labels={amenityLabels} />
+              <EquipmentPicker items={equipmentItems ?? []} selected={data.amenities ?? []} />
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader><CardTitle className="text-base">{t("section_pricing")}</CardTitle></CardHeader>
             <CardContent>
-              <div className="space-y-2 max-w-xs">
-                <Label htmlFor="price_per_night">{t("label_price")}</Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">€</span>
-                  <Input id="price_per_night" name="price_per_night" type="number" min={1} defaultValue={data.price_per_night} required className="pl-7" />
-                </div>
-              </div>
+              <PricingInput
+                config={platformConfig}
+                defaultPrice={Number(data.price_per_night)}
+                defaultPriceType={(data.price_type as "guest_pays" | "host_earns") ?? "guest_pays"}
+              />
             </CardContent>
           </Card>
 
@@ -164,10 +225,49 @@ async function EditListing(props: { params: Promise<{ id: string }> }) {
           </CardContent>
         </Card>
 
-        <div className="border-t border-border pt-8">
-          <p className="text-sm text-muted-foreground mb-3">{t("danger_zone")}</p>
+        {/* Cancellation policy */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4" />
+              Cancellation policy
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CancellationPolicyForm listingId={data.id} initial={cancellationPolicy} />
+          </CardContent>
+        </Card>
+
+        {/* Property rules */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <ClipboardList className="h-4 w-4" />
+              Property rules
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <PropertyRulesForm listingId={data.id} initial={propertyRules} />
+          </CardContent>
+        </Card>
+
+        <div className="border-t border-border pt-8 flex items-center justify-between flex-wrap gap-4">
+          <form action={archiveListing.bind(null, data.id, !data.is_archived)}>
+            <button
+              type="submit"
+              className={`text-sm transition ${
+                data.is_archived
+                  ? "text-primary hover:text-primary/80"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {data.is_archived ? "Unarchive listing" : "Archive listing"}
+            </button>
+          </form>
           <form action={deleteListing.bind(null, data.id)}>
-            <button className="text-sm text-destructive hover:underline">{t("delete")}</button>
+            <button className="text-sm text-muted-foreground hover:text-destructive transition">
+              {t("delete")}
+            </button>
           </form>
         </div>
 
@@ -176,10 +276,10 @@ async function EditListing(props: { params: Promise<{ id: string }> }) {
   );
 }
 
-export default function Page(props: { params: Promise<{ id: string }> }) {
+export default function Page(props: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string }> }) {
   return (
     <Suspense fallback={<div className="p-10 text-muted-foreground">Loading…</div>}>
-      <EditListing params={props.params} />
+      <EditListing params={props.params} searchParams={props.searchParams} />
     </Suspense>
   );
 }

@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import Link from "next/link";
@@ -9,6 +10,10 @@ import Users from "./_tabs/users";
 import Listings from "./_tabs/listings";
 import Applications from "./_tabs/applications";
 import Reviews from "./_tabs/reviews";
+import Equipment from "./_tabs/equipment";
+import Moderation from "./_tabs/moderation";
+import HostMetricsTab from "./_tabs/host-metrics";
+import SettingsTab from "./_tabs/settings";
 
 type SearchParams = Promise<{ tab?: string; status?: string }>;
 
@@ -31,7 +36,8 @@ async function AdminPage({ searchParams }: { searchParams: SearchParams }) {
   const t = await getTranslations("admin");
 
   // Fetch badge counts in parallel
-  const [pendingBookingsResult, pendingListingsResult, pendingApplicationsResult] =
+  const admin = createAdminClient();
+  const [pendingBookingsResult, pendingListingsResult, pendingApplicationsResult, pendingViolationsResult] =
     await Promise.all([
       supabase
         .from("bookings")
@@ -45,11 +51,16 @@ async function AdminPage({ searchParams }: { searchParams: SearchParams }) {
         .from("host_applications")
         .select("id", { count: "exact", head: true })
         .eq("status", "pending"),
+      admin
+        .from("chat_violations")
+        .select("id", { count: "exact", head: true })
+        .eq("is_reviewed", false),
     ]);
 
   const pendingBookingsCount = pendingBookingsResult.count ?? 0;
   const pendingListingsCount = pendingListingsResult.count ?? 0;
   const pendingApplicationsCount = pendingApplicationsResult.count ?? 0;
+  const pendingViolationsCount = pendingViolationsResult.count ?? 0;
 
   const tabs = [
     { key: "overview", label: t("tab_overview"), badge: 0 },
@@ -58,6 +69,10 @@ async function AdminPage({ searchParams }: { searchParams: SearchParams }) {
     { key: "listings", label: t("tab_listings"), badge: pendingListingsCount },
     { key: "applications", label: t("tab_applications"), badge: pendingApplicationsCount },
     { key: "reviews", label: t("tab_reviews"), badge: 0 },
+    { key: "equipment", label: "Equipment", badge: 0 },
+    { key: "moderation", label: "Moderation", badge: pendingViolationsCount },
+    { key: "host-metrics", label: "Host Metrics", badge: 0 },
+    { key: "settings", label: "Settings", badge: 0 },
   ] as const;
 
   return (
@@ -116,6 +131,10 @@ async function AdminPage({ searchParams }: { searchParams: SearchParams }) {
           {activeTab === "listings" && <Listings status={params.status} />}
           {activeTab === "applications" && <Applications />}
           {activeTab === "reviews" && <Reviews />}
+          {activeTab === "equipment" && <Equipment />}
+          {activeTab === "moderation" && <Moderation />}
+          {activeTab === "host-metrics" && <HostMetricsTab />}
+          {activeTab === "settings" && <SettingsTab />}
         </Suspense>
       </div>
     </main>

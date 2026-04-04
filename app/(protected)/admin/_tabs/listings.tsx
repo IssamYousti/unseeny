@@ -2,16 +2,27 @@ import { unstable_noStore } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getTranslations } from "next-intl/server";
 import Link from "next/link";
-import { approveListing, rejectListing } from "../actions";
+import { approveListing } from "../actions";
+import RejectListingDialog from "@/components/admin/RejectListingDialog";
 
 type Props = { status?: string };
 
-function StatusBadge({ approved }: { approved: boolean }) {
-  return approved ? (
-    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-      Approved
-    </span>
-  ) : (
+function StatusBadge({ approved, rejected }: { approved: boolean; rejected?: boolean }) {
+  if (approved) {
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+        Approved
+      </span>
+    );
+  }
+  if (rejected) {
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
+        Rejected
+      </span>
+    );
+  }
+  return (
     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
       Pending
     </span>
@@ -25,7 +36,7 @@ export default async function Listings({ status }: Props) {
 
   let listingsQuery = supabase
     .from("listings")
-    .select("id, title, city, country, price_per_night, host_id, is_approved, created_at")
+    .select("id, title, city, country, price_per_night, host_id, is_approved, is_rejected, created_at")
     .order("created_at", { ascending: false });
 
   if (status === "pending") {
@@ -148,7 +159,7 @@ export default async function Listings({ status }: Props) {
                         {l.price_per_night != null ? `€${l.price_per_night}` : "—"}
                       </td>
                       <td className="px-4 py-3">
-                        <StatusBadge approved={l.is_approved} />
+                        <StatusBadge approved={l.is_approved} rejected={l.is_rejected} />
                       </td>
                       <td className="px-4 py-3 text-muted-foreground tabular-nums">
                         {bookingCount > 0 ? bookingCount : <span className="opacity-40">—</span>}
@@ -172,6 +183,12 @@ export default async function Listings({ status }: Props) {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
+                          <Link
+                            href={`/admin/listings/${l.id}`}
+                            className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition"
+                          >
+                            View
+                          </Link>
                           {!l.is_approved && (
                             <form action={approveListing.bind(null, l.id)}>
                               <button className="bg-primary text-primary-foreground px-3 py-1.5 rounded-lg text-xs font-medium hover:opacity-90 transition">
@@ -179,13 +196,7 @@ export default async function Listings({ status }: Props) {
                               </button>
                             </form>
                           )}
-                          {l.is_approved && (
-                            <form action={rejectListing.bind(null, l.id)}>
-                              <button className="bg-card border border-border text-foreground px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-muted transition">
-                                {t("reject_listing")}
-                              </button>
-                            </form>
-                          )}
+                          <RejectListingDialog listingId={l.id} listingTitle={l.title} />
                         </div>
                       </td>
                     </tr>
