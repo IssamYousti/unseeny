@@ -122,18 +122,18 @@ export default async function Listings({ status }: Props) {
       ) : (
         <div className="bg-card border border-border rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="table-auto w-full text-sm">
+            <table className="table-auto w-full text-sm min-w-[480px]">
               <thead className="bg-muted text-muted-foreground text-xs uppercase tracking-wide">
                 <tr>
                   <th className="text-left px-4 py-3">{t("col_title")}</th>
-                  <th className="text-left px-4 py-3">{t("col_host")}</th>
-                  <th className="text-left px-4 py-3">{t("col_city")}</th>
-                  <th className="text-left px-4 py-3">{t("col_country")}</th>
+                  <th className="text-left px-4 py-3 hidden sm:table-cell">{t("col_host")}</th>
+                  <th className="text-left px-4 py-3 hidden md:table-cell">{t("col_city")}</th>
+                  <th className="text-left px-4 py-3 hidden lg:table-cell">{t("col_country")}</th>
                   <th className="text-left px-4 py-3">{t("col_price")}</th>
                   <th className="text-left px-4 py-3">{t("col_status")}</th>
-                  <th className="text-left px-4 py-3">{t("col_bookings_count")}</th>
-                  <th className="text-left px-4 py-3">{t("col_rating")}</th>
-                  <th className="text-left px-4 py-3">{t("col_created")}</th>
+                  <th className="text-left px-4 py-3 hidden md:table-cell">{t("col_bookings_count")}</th>
+                  <th className="text-left px-4 py-3 hidden md:table-cell">{t("col_rating")}</th>
+                  <th className="text-left px-4 py-3 hidden lg:table-cell">{t("col_created")}</th>
                   <th className="text-left px-4 py-3">{t("col_actions")}</th>
                 </tr>
               </thead>
@@ -147,24 +147,27 @@ export default async function Listings({ status }: Props) {
 
                   return (
                     <tr key={l.id} className="border-t border-border hover:bg-muted/30 transition-colors">
-                      <td className="px-4 py-3 font-medium max-w-[200px]">
+                      <td className="px-4 py-3 font-medium max-w-[140px] sm:max-w-[200px]">
                         <div className="truncate">{l.title}</div>
+                        <div className="text-xs text-muted-foreground md:hidden truncate">
+                          {[l.city, l.country].filter(Boolean).join(", ")}
+                        </div>
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">
+                      <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">
                         {hostMap.get(l.host_id) ?? l.host_id.slice(0, 8) + "…"}
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">{l.city ?? "—"}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{l.country ?? "—"}</td>
+                      <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{l.city ?? "—"}</td>
+                      <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell">{l.country ?? "—"}</td>
                       <td className="px-4 py-3 font-medium tabular-nums">
                         {l.price_per_night != null ? `€${l.price_per_night}` : "—"}
                       </td>
                       <td className="px-4 py-3">
                         <StatusBadge approved={l.is_approved} rejected={l.is_rejected} />
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground tabular-nums">
+                      <td className="px-4 py-3 text-muted-foreground tabular-nums hidden md:table-cell">
                         {bookingCount > 0 ? bookingCount : <span className="opacity-40">—</span>}
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">
+                      <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">
                         {avgRating ? (
                           <span className="flex items-center gap-1">
                             <span className="text-amber-400">★</span>
@@ -174,7 +177,7 @@ export default async function Listings({ status }: Props) {
                           <span className="opacity-40">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap hidden lg:table-cell">
                         {new Date(l.created_at).toLocaleDateString("en-GB", {
                           day: "numeric",
                           month: "short",
@@ -182,7 +185,7 @@ export default async function Listings({ status }: Props) {
                         })}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <Link
                             href={`/admin/listings/${l.id}`}
                             className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition"

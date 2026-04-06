@@ -9,17 +9,17 @@ export default async function Home() {
     <main className="min-h-screen bg-background">
 
       {/* HERO */}
-      <section className="max-w-6xl mx-auto px-6 py-20 lg:py-32">
-        <div className="grid lg:grid-cols-2 gap-16 items-center">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20 lg:py-32">
+        <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
 
           {/* Left column */}
-          <div className="space-y-8">
+          <div className="space-y-6 sm:space-y-8">
             <div className="space-y-4">
-              <h1 className="text-5xl md:text-6xl font-semibold tracking-tight leading-[1.1]">
+              <h1 className="text-4xl sm:text-5xl md:text-6xl font-semibold tracking-tight leading-[1.1]">
                 {t("headline")}<br />
                 <span className="text-primary">{t("headline_accent")}</span>
               </h1>
-              <p className="text-lg text-muted-foreground max-w-md leading-relaxed">
+              <p className="text-base sm:text-lg text-muted-foreground max-w-md leading-relaxed">
                 {t("description")}
               </p>
             </div>
@@ -40,16 +40,10 @@ export default async function Home() {
               </a>
             </div>
 
-            <p className="text-sm text-muted-foreground">
-              {t("have_account")}{" "}
-              <Link href="/auth/login" className="underline hover:text-foreground transition">
-                {t("login_link")}
-              </Link>
-            </p>
           </div>
 
           {/* Right column — 2×2 placeholder grid */}
-          <div className="relative grid grid-cols-2 gap-3">
+          <div className="relative grid grid-cols-2 gap-2 sm:gap-3">
             <div className="aspect-[4/3] rounded-2xl bg-gradient-to-br from-primary/20 to-secondary" />
             <div className="aspect-[4/3] rounded-2xl bg-gradient-to-br from-secondary to-accent/20 mt-6" />
             <div className="aspect-[4/3] rounded-2xl bg-gradient-to-br from-accent/10 to-primary/10 -mt-6" />
@@ -72,8 +66,8 @@ export default async function Home() {
 
       {/* TRUST BADGES */}
       <section className="border-y border-border bg-secondary/40">
-        <div className="max-w-6xl mx-auto px-6 py-16">
-          <div className="grid sm:grid-cols-3 gap-10">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
+          <div className="grid sm:grid-cols-3 gap-8 sm:gap-10">
 
             <div className="space-y-3">
               <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -104,13 +98,13 @@ export default async function Home() {
       </section>
 
       {/* HOW IT WORKS */}
-      <section id="how-it-works" className="max-w-6xl mx-auto px-6 py-20">
-        <h2 className="text-3xl font-semibold tracking-tight mb-12">{t("how_title")}</h2>
+      <section id="how-it-works" className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
+        <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-8 sm:mb-12">{t("how_title")}</h2>
 
-        <div className="grid lg:grid-cols-2 gap-6">
+        <div className="grid lg:grid-cols-2 gap-4 sm:gap-6">
 
           {/* ── For guests ── */}
-          <div className="rounded-2xl border border-border bg-secondary/30 p-8 flex flex-col">
+          <div className="rounded-2xl border border-border bg-secondary/30 p-6 sm:p-8 flex flex-col">
             <div className="mb-8">
               <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-primary bg-primary/10 border border-primary/20 px-3 py-1.5 rounded-full">
                 <Search className="h-3 w-3" />
@@ -149,7 +143,7 @@ export default async function Home() {
           </div>
 
           {/* ── For hosts ── */}
-          <div className="rounded-2xl border border-border bg-secondary/30 p-8 flex flex-col">
+          <div className="rounded-2xl border border-border bg-secondary/30 p-6 sm:p-8 flex flex-col">
             <div className="mb-8">
               <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-foreground bg-foreground/8 border border-border px-3 py-1.5 rounded-full">
                 <Star className="h-3 w-3" />
@@ -192,9 +186,9 @@ export default async function Home() {
 
       {/* HOST CTA STRIP */}
       <section className="bg-primary">
-        <div className="max-w-6xl mx-auto px-6 py-14 flex flex-col sm:flex-row items-center justify-between gap-6">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-14 flex flex-col sm:flex-row items-center justify-between gap-6">
           <div>
-            <h2 className="text-2xl font-semibold text-primary-foreground">{t("host_cta_title")}</h2>
+            <h2 className="text-xl sm:text-2xl font-semibold text-primary-foreground">{t("host_cta_title")}</h2>
             <p className="text-primary-foreground/70 mt-1">{t("host_cta_desc")}</p>
           </div>
           <Link

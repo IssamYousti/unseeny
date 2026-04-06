@@ -11,6 +11,7 @@ import EquipmentDisplay from "@/components/EquipmentDisplay";
 import FavouriteButton from "@/components/FavouriteButton";
 import PropertyRulesDisplay from "@/components/PropertyRulesDisplay";
 import CancellationPolicyDisplay from "@/components/CancellationPolicyDisplay";
+import DescriptionExpander from "@/components/DescriptionExpander";
 import { computeHostMetrics, computeHostingYears, formatResponseTime } from "@/lib/host-metrics";
 
 /** Shown to unauthenticated visitors instead of the full booking widget */
@@ -163,13 +164,28 @@ async function ListingDetail(props: { params: Promise<{ id: string }> }) {
     anonymous: t("reviews_anonymous"),
   };
 
+  const BookingPanel = user ? (
+    <BookingWidget
+      listingId={data.id}
+      pricePerNight={data.price_per_night}
+      maxGuests={data.max_guests}
+      unavailablePeriods={unavailablePeriods}
+      labels={bookingLabels}
+    />
+  ) : (
+    <LoginToBookPanel
+      pricePerNight={data.price_per_night}
+      listingId={data.id}
+    />
+  );
+
   return (
     <main className="bg-background min-h-screen">
-      <div className="max-w-6xl mx-auto px-6 py-10 space-y-10">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-6 sm:space-y-10">
 
         {/* TITLE */}
         <section>
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-2 mb-3 flex-wrap">
             <span className="flex items-center gap-1.5 bg-accent/10 text-accent border border-accent/30 text-xs font-medium px-3 py-1 rounded-full">
               <Lock className="h-3 w-3" />
               {t("verified_badge")}
@@ -186,7 +202,7 @@ async function ListingDetail(props: { params: Promise<{ id: string }> }) {
           </div>
 
           <div className="flex items-start justify-between gap-4">
-            <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">{data.title}</h1>
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold tracking-tight">{data.title}</h1>
             {user && (
               <div className="shrink-0 mt-1">
                 <FavouriteButton
@@ -201,7 +217,7 @@ async function ListingDetail(props: { params: Promise<{ id: string }> }) {
         </section>
 
         {/* IMAGES */}
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
           <div className="aspect-[4/3] rounded-2xl overflow-hidden bg-gradient-to-br from-primary/20 via-secondary to-accent/10">
             {images[0] ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -212,7 +228,7 @@ async function ListingDetail(props: { params: Promise<{ id: string }> }) {
               </div>
             )}
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className="aspect-square rounded-2xl overflow-hidden bg-gradient-to-br from-secondary to-muted">
                 {images[i] ? (
@@ -224,22 +240,23 @@ async function ListingDetail(props: { params: Promise<{ id: string }> }) {
           </div>
         </section>
 
-        {/* CONTENT + BOOKING */}
-        <section className="grid lg:grid-cols-[1fr_350px] gap-12">
+        {/* Mobile booking panel — shown above content on small screens */}
+        <div className="lg:hidden">
+          {BookingPanel}
+        </div>
+
+        {/* CONTENT + BOOKING SIDEBAR */}
+        <section className="grid lg:grid-cols-[1fr_360px] gap-8 lg:gap-12">
 
           <div className="space-y-8">
             {/* Description */}
             <div>
               <h2 className="text-xl font-semibold mb-3">{t("about")}</h2>
               {data.descr ? (
-                data.descr.startsWith("<") ? (
-                  <div
-                    className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground"
-                    dangerouslySetInnerHTML={{ __html: data.descr }}
-                  />
-                ) : (
-                  <p className="text-muted-foreground leading-relaxed whitespace-pre-line">{data.descr}</p>
-                )
+                <DescriptionExpander
+                  html={data.descr.startsWith("<") ? data.descr : undefined}
+                  text={data.descr.startsWith("<") ? undefined : data.descr}
+                />
               ) : (
                 <p className="text-muted-foreground">{t("no_description")}</p>
               )}
@@ -248,18 +265,18 @@ async function ListingDetail(props: { params: Promise<{ id: string }> }) {
             {/* Details */}
             <div>
               <h2 className="text-xl font-semibold mb-4">{t("details")}</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
-                <div>
-                  <p className="text-muted-foreground text-sm">{t("guests")}</p>
-                  <p className="font-medium">{data.max_guests}</p>
+              <div className="grid grid-cols-3 gap-4 sm:gap-6">
+                <div className="bg-muted/30 border border-border rounded-xl px-4 py-3">
+                  <p className="text-muted-foreground text-xs mb-1">{t("guests")}</p>
+                  <p className="font-semibold text-lg">{data.max_guests}</p>
                 </div>
-                <div>
-                  <p className="text-muted-foreground text-sm">{t("bedrooms")}</p>
-                  <p className="font-medium">{data.bedrooms}</p>
+                <div className="bg-muted/30 border border-border rounded-xl px-4 py-3">
+                  <p className="text-muted-foreground text-xs mb-1">{t("bedrooms")}</p>
+                  <p className="font-semibold text-lg">{data.bedrooms}</p>
                 </div>
-                <div>
-                  <p className="text-muted-foreground text-sm">{t("bathrooms")}</p>
-                  <p className="font-medium">{data.bathrooms}</p>
+                <div className="bg-muted/30 border border-border rounded-xl px-4 py-3">
+                  <p className="text-muted-foreground text-xs mb-1">{t("bathrooms")}</p>
+                  <p className="font-semibold text-lg">{data.bathrooms}</p>
                 </div>
               </div>
             </div>
@@ -281,12 +298,12 @@ async function ListingDetail(props: { params: Promise<{ id: string }> }) {
             )}
 
             {/* Property rules */}
-            <div className="border border-border rounded-2xl p-6">
+            <div className="border border-border rounded-2xl p-5 sm:p-6">
               <PropertyRulesDisplay listingId={data.id} />
             </div>
 
             {/* Cancellation policy */}
-            <div className="border border-border rounded-2xl p-6">
+            <div className="border border-border rounded-2xl p-5 sm:p-6">
               <CancellationPolicyDisplay listingId={data.id} />
             </div>
 
@@ -294,8 +311,8 @@ async function ListingDetail(props: { params: Promise<{ id: string }> }) {
             {hostProfile && (
               <div>
                 <h2 className="text-xl font-semibold mb-4">Meet your host</h2>
-                <div className="bg-card border border-border rounded-2xl p-6 space-y-5">
-                  <div className="flex items-start gap-4">
+                <div className="bg-card border border-border rounded-2xl p-5 sm:p-6 space-y-5">
+                  <div className="flex items-start gap-4 flex-wrap sm:flex-nowrap">
                     {/* Avatar */}
                     <div className="relative shrink-0">
                       <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 flex items-center justify-center text-xl font-bold text-primary select-none">
@@ -385,22 +402,9 @@ async function ListingDetail(props: { params: Promise<{ id: string }> }) {
             <ReviewList listingId={data.id} labels={reviewListLabels} />
           </div>
 
-          {/* Booking sidebar */}
-          <aside className="h-fit sticky top-24">
-            {user ? (
-              <BookingWidget
-                listingId={data.id}
-                pricePerNight={data.price_per_night}
-                maxGuests={data.max_guests}
-                unavailablePeriods={unavailablePeriods}
-                labels={bookingLabels}
-              />
-            ) : (
-              <LoginToBookPanel
-                pricePerNight={data.price_per_night}
-                listingId={data.id}
-              />
-            )}
+          {/* Booking sidebar — desktop only */}
+          <aside className="hidden lg:block h-fit sticky top-24">
+            {BookingPanel}
           </aside>
 
         </section>

@@ -81,13 +81,13 @@ async function HostProfile({ id }: { id: string }) {
 
   return (
     <main className="bg-background min-h-screen">
-      <div className="max-w-3xl mx-auto px-6 py-14 space-y-10">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-14 space-y-8 sm:space-y-10">
 
         {/* ── Host identity card ─────────────────────────────────────────── */}
         <div className="bg-card border border-border rounded-3xl overflow-hidden">
           <div className="h-2 bg-gradient-to-r from-primary/60 via-primary to-primary/40" />
 
-          <div className="p-8 space-y-6">
+          <div className="p-5 sm:p-8 space-y-6">
             {/* Header row */}
             <div className="flex items-start gap-6 flex-wrap sm:flex-nowrap">
               {/* Avatar */}
@@ -138,7 +138,7 @@ async function HostProfile({ id }: { id: string }) {
             </div>
 
             {/* Metrics strip */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <MetricTile
                 icon={<CalendarDays className="h-4 w-4" />}
                 label="Years hosting"

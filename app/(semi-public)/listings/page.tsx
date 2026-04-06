@@ -15,6 +15,7 @@ type SearchParams = {
   locationCountry?: string;
   q?: string;
   guests?: string;
+  minPrice?: string;
   maxPrice?: string;
   checkIn?: string;
   checkOut?: string;
@@ -32,6 +33,7 @@ async function ListingsLoader({ searchParams }: { searchParams: SearchParams }) 
       locationCountry: searchParams.locationCountry,
       query: searchParams.q,
       guests: searchParams.guests ? Number(searchParams.guests) : undefined,
+      minPrice: searchParams.minPrice ? Number(searchParams.minPrice) : undefined,
       maxPrice: searchParams.maxPrice ? Number(searchParams.maxPrice) : undefined,
       checkIn: searchParams.checkIn,
       checkOut: searchParams.checkOut,
@@ -62,6 +64,7 @@ async function ListingsLoader({ searchParams }: { searchParams: SearchParams }) 
     searchParams.locationCountry ||
     searchParams.q ||
     searchParams.guests ||
+    searchParams.minPrice ||
     searchParams.maxPrice ||
     searchParams.checkIn ||
     searchParams.checkOut ||

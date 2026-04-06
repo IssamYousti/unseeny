@@ -10,20 +10,24 @@ export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q")?.trim();
   if (!q || q.length < 2) return NextResponse.json([]);
 
+  // Forward the user's browser language so results come back in their language
+  // (e.g. typing "gent" finds the city whether the user uses FR/NL/EN)
+  const acceptLanguage = req.headers.get("accept-language") ?? "*";
+
   const url = new URL(NOMINATIM);
   url.searchParams.set("q", q);
   url.searchParams.set("format", "json");
   url.searchParams.set("addressdetails", "1");
-  url.searchParams.set("limit", "6");
-  // Bias toward places (cities, countries, states) rather than POIs
-  url.searchParams.set("featuretype", "city,country,state,settlement");
+  url.searchParams.set("limit", "8");
+  // featuretype accepts ONE value — "settlement" covers cities, towns, villages
+  url.searchParams.set("featuretype", "settlement");
 
   const res = await fetch(url.toString(), {
     headers: {
       "User-Agent": "Unseeny/1.0 (platform for private property rentals)",
-      "Accept-Language": "en",
+      "Accept-Language": acceptLanguage,
     },
-    next: { revalidate: 300 }, // cache 5 min
+    next: { revalidate: 60 }, // shorter cache so language variants resolve quickly
   });
 
   if (!res.ok) return NextResponse.json([]);

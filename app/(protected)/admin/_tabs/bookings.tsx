@@ -101,16 +101,16 @@ export default async function Bookings({ status }: Props) {
       ) : (
         <div className="bg-card border border-border rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="table-auto w-full text-sm">
+            <table className="table-auto w-full text-sm min-w-[500px]">
               <thead className="bg-muted text-muted-foreground text-xs uppercase tracking-wide">
                 <tr>
                   <th className="text-left px-4 py-3">{t("col_title")}</th>
                   <th className="text-left px-4 py-3">{t("col_guest")}</th>
-                  <th className="text-left px-4 py-3">{t("col_host")}</th>
-                  <th className="text-left px-4 py-3">{t("col_dates")}</th>
+                  <th className="text-left px-4 py-3 hidden md:table-cell">{t("col_host")}</th>
+                  <th className="text-left px-4 py-3 hidden sm:table-cell">{t("col_dates")}</th>
                   <th className="text-left px-4 py-3">{t("col_amount")}</th>
                   <th className="text-left px-4 py-3">{t("col_status")}</th>
-                  <th className="text-left px-4 py-3">{t("col_created")}</th>
+                  <th className="text-left px-4 py-3 hidden lg:table-cell">{t("col_created")}</th>
                   <th className="text-left px-4 py-3">{t("col_actions")}</th>
                 </tr>
               </thead>
@@ -120,14 +120,14 @@ export default async function Bookings({ status }: Props) {
                   return (
                     <tr key={b.id} className="border-t border-border hover:bg-muted/30 transition-colors">
                       <td className="px-4 py-3 font-medium">
-                        <div>{listing?.title ?? "—"}</div>
+                        <div className="truncate max-w-[120px] sm:max-w-[160px]">{listing?.title ?? "—"}</div>
                         {listing?.city && (
                           <div className="text-xs text-muted-foreground">{listing.city}</div>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">{userName(b.guest_id)}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{userName(b.host_id)}</td>
-                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                      <td className="px-4 py-3 text-muted-foreground truncate max-w-[100px]">{userName(b.guest_id)}</td>
+                      <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{userName(b.host_id)}</td>
+                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap hidden sm:table-cell">
                         {new Date(b.check_in).toLocaleDateString("en-GB", {
                           day: "numeric",
                           month: "short",
@@ -145,7 +145,7 @@ export default async function Bookings({ status }: Props) {
                       <td className="px-4 py-3">
                         <StatusBadge status={b.status} />
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap hidden lg:table-cell">
                         {new Date(b.created_at).toLocaleDateString("en-GB", {
                           day: "numeric",
                           month: "short",

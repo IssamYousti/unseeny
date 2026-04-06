@@ -108,23 +108,25 @@ export async function createBooking(_prev: unknown, formData: FormData) {
     return { error: "Could not create booking. Please try again." };
   }
 
-  // Insert booking summary + optional guest message into conversation
+  // Insert a single human-friendly booking message into the conversation
   if (conversation?.id) {
-    const messages = [
-      {
-        conversation_id: conversation.id,
-        sender_id: user.id,
-        content: `📅 Booking request\nCheck-in: ${checkIn}\nCheck-out: ${checkOut}\nGuests: ${guestsCount} · ${nights} night${nights !== 1 ? "s" : ""}\nTotal: €${totalPrice.toLocaleString()}`,
-      },
+    const fmt = (d: string) =>
+      new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+
+    const bookingLines = [
+      `I'd like to book your property from ${fmt(checkIn)} to ${fmt(checkOut)} — that's ${nights} night${nights !== 1 ? "s" : ""} for ${guestsCount} guest${guestsCount !== 1 ? "s" : ""}, with a total of €${totalPrice.toLocaleString()}.`,
     ];
+
     if (guestMessage) {
-      messages.push({
-        conversation_id: conversation.id,
-        sender_id: user.id,
-        content: guestMessage,
-      });
+      bookingLines.push("");
+      bookingLines.push(guestMessage);
     }
-    await admin.from("messages").insert(messages);
+
+    await admin.from("messages").insert({
+      conversation_id: conversation.id,
+      sender_id: user.id,
+      content: bookingLines.join("\n"),
+    });
   }
 
   // Notify host (in-app)

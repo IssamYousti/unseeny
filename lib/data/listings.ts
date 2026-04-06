@@ -11,6 +11,7 @@ export type ListingFilters = {
   locationCity?: string;   // structured city filter (from geocode autocomplete)
   locationCountry?: string; // structured country filter
   guests?: number;         // minimum capacity required
+  minPrice?: number;       // minimum price per night
   maxPrice?: number;       // maximum price per night
   checkIn?: string;        // ISO date — filter out unavailable listings
   checkOut?: string;       // ISO date — filter out unavailable listings
@@ -43,6 +44,11 @@ export async function getApprovedListings(filters: ListingFilters = {}) {
   // Minimum guest capacity
   if (filters.guests && filters.guests > 1) {
     query = query.gte("max_guests", filters.guests);
+  }
+
+  // Minimum price per night
+  if (filters.minPrice && filters.minPrice > 0) {
+    query = query.gte("price_per_night", filters.minPrice);
   }
 
   // Maximum price per night
