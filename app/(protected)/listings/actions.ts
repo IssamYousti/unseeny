@@ -6,6 +6,20 @@ import { redirect } from "next/navigation";
 import { guestPriceToHostPayout } from "@/lib/platform-config";
 import { getPlatformConfig } from "@/lib/platform-config.server";
 
+async function getTimezoneFromCoords(lat: number, lng: number): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `https://timeapi.io/api/Time/current/coordinate?latitude=${lat}&longitude=${lng}`,
+      { next: { revalidate: 0 } },
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    return (data.timeZone as string) || null;
+  } catch {
+    return null;
+  }
+}
+
 async function geocodeAddress(
   street: string,
   houseNumber: string,
@@ -74,7 +88,22 @@ export async function createOrUpdateListing(formData: FormData) {
   const hostPayout = Number(formData.get("host_payout_per_night")) || guestPriceToHostPayout(guestPrice, cfg);
 
   // ── Geocode ───────────────────────────────────────────────────────────────
-  const coords = await geocodeAddress(street, houseNumber, zipCode, city, country);
+  // Use client-provided coordinates (from address autocomplete) if available,
+  // otherwise fall back to Nominatim geocoding.
+  const clientLat = formData.get("latitude") ? parseFloat(formData.get("latitude") as string) : NaN;
+  const clientLng = formData.get("longitude") ? parseFloat(formData.get("longitude") as string) : NaN;
+
+  let coords: { latitude: number; longitude: number } | null = null;
+  if (!isNaN(clientLat) && !isNaN(clientLng)) {
+    coords = { latitude: clientLat, longitude: clientLng };
+  } else {
+    coords = await geocodeAddress(street, houseNumber, zipCode, city, country);
+  }
+
+  // Use client-detected timezone if available (set when address was selected in autocomplete),
+  // otherwise fall back to server-side detection from coordinates
+  const clientTimezone = (formData.get("detected_timezone") as string | null) || null;
+  const timezone = clientTimezone ?? (coords ? await getTimezoneFromCoords(coords.latitude, coords.longitude) : null);
 
   const payload = {
     host_id: user.id,
@@ -88,6 +117,7 @@ export async function createOrUpdateListing(formData: FormData) {
     country,
     latitude: coords?.latitude ?? null,
     longitude: coords?.longitude ?? null,
+    timezone: timezone ?? null,
     max_guests: Number(formData.get("max_guests")),
     bedrooms: Number(formData.get("bedrooms")),
     bathrooms: Number(formData.get("bathrooms")),

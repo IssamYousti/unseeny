@@ -13,6 +13,8 @@ type SearchParams = {
   location?: string;
   locationCity?: string;
   locationCountry?: string;
+  locationLat?: string;
+  locationLon?: string;
   q?: string;
   guests?: string;
   minPrice?: string;
@@ -135,11 +137,19 @@ async function ListingsLoader({ searchParams }: { searchParams: SearchParams }) 
         <SearchFilters labels={filterLabels} amenityItems={amenityItems} />
       </section>
 
-      {/* MAP — inline card, only when there are geocoded listings */}
-      {mapListings.length > 0 && (
+      {/* MAP — only shown when a location filter is active */}
+      {(searchParams.locationCity || searchParams.locationCountry) && mapListings.length > 0 && (
         <section className="max-w-4xl mx-auto px-6 pt-6">
           <div className="h-64 sm:h-80 rounded-2xl overflow-hidden border border-border shadow-sm">
-            <ListingsMap listings={mapListings} />
+            <ListingsMap
+              listings={mapListings}
+              center={
+                searchParams.locationLat && searchParams.locationLon
+                  ? [Number(searchParams.locationLat), Number(searchParams.locationLon)]
+                  : undefined
+              }
+              zoom={searchParams.locationLat ? 10 : undefined}
+            />
           </div>
         </section>
       )}

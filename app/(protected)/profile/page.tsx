@@ -208,13 +208,13 @@ async function ProfilePage({ tab, applied }: { tab: Tab; applied: boolean }) {
             {isApprovedHost && (listings ?? []).length > 0 && (
               <section className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-base font-semibold">My properties</h2>
+                  <h2 className="text-base font-semibold">My listings</h2>
                   <div className="flex items-center gap-3">
                     <Link href="/listings/bookings" className="text-xs text-muted-foreground hover:text-foreground border border-border px-3 py-1.5 rounded-lg transition">
                       Bookings
                     </Link>
                     <Link href="/listings/manage" className="text-xs font-medium bg-primary text-primary-foreground px-3 py-1.5 rounded-lg hover:opacity-90 transition">
-                      + Add property
+                      + Add listing
                     </Link>
                   </div>
                 </div>
@@ -227,7 +227,7 @@ async function ProfilePage({ tab, applied }: { tab: Tab; applied: boolean }) {
                 <Home className="h-8 w-8 text-muted-foreground/40 mx-auto mb-3" />
                 <p className="text-sm text-muted-foreground">You haven't created any listings yet.</p>
                 <Link href="/listings/manage" className="mt-3 inline-block text-sm font-medium text-primary hover:underline">
-                  Create your first property →
+                  Create your first listing →
                 </Link>
               </div>
             )}

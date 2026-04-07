@@ -12,10 +12,18 @@ const ListingsMapInner = dynamic(() => import("./ListingsMapInner"), {
 
 export type { MapListing };
 
-export default function ListingsMap({ listings }: { listings: MapListing[] }) {
+export default function ListingsMap({
+  listings,
+  center,
+  zoom,
+}: {
+  listings: MapListing[];
+  center?: [number, number];
+  zoom?: number;
+}) {
   return (
     <div className="w-full h-full relative">
-      <ListingsMapInner listings={listings} />
+      <ListingsMapInner listings={listings} center={center} zoom={zoom} />
     </div>
   );
 }

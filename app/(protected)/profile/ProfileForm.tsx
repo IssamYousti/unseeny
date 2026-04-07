@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useEffect } from "react";
+import { useActionState, useRef, useEffect, useState } from "react";
 import { updateProfile } from "./actions";
 import {
   CheckCircle2,
@@ -9,8 +9,9 @@ import {
   AtSign,
   Calendar,
   Globe,
-  Mic2,
   Sparkles,
+  Building2,
+  Receipt,
 } from "lucide-react";
 
 type Props = {
@@ -22,6 +23,9 @@ type Props = {
     host_bio?: string | null;
     hosting_since?: string | null;
     languages?: string[] | null;
+    is_business?: boolean | null;
+    vat_number?: string | null;
+    billing_country?: string | null;
   };
   isHost?: boolean;
 };
@@ -162,6 +166,7 @@ export default function ProfileForm({ profile, isHost }: Props) {
     updateProfile,
     null
   );
+  const [isBusiness, setIsBusiness] = useState(profile.is_business ?? false);
 
   const languagesValue = (profile.languages ?? []).join(", ");
 
@@ -253,6 +258,54 @@ export default function ProfileForm({ profile, isHost }: Props) {
           />
         </SectionCard>
       )}
+
+      {/* ── Billing & VAT ────────────────────────────────────────────────── */}
+      <SectionCard
+        title="Billing & VAT"
+        subtitle="Required for correct VAT treatment on Unseeny service fees."
+        accentColor="from-emerald-500/70 via-emerald-400 to-emerald-500/30"
+      >
+        {/* Is business toggle */}
+        <label className="flex items-center justify-between gap-4 cursor-pointer">
+          <div className="flex items-center gap-3">
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+            <div>
+              <p className="text-sm font-medium">I represent a business</p>
+              <p className="text-xs text-muted-foreground/60 mt-0.5">
+                Enables reverse charge if you are VAT-registered in another EU country.
+              </p>
+            </div>
+          </div>
+          <div
+            onClick={() => setIsBusiness((v) => !v)}
+            className={`h-6 w-11 rounded-full relative transition-colors shrink-0 cursor-pointer ${isBusiness ? "bg-primary" : "bg-muted"}`}
+          >
+            <div className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-transform ${isBusiness ? "translate-x-5" : "translate-x-1"}`} />
+          </div>
+          <input type="hidden" name="is_business" value={isBusiness ? "true" : "false"} />
+        </label>
+
+        {isBusiness && (
+          <>
+            <InputField
+              label="VAT number"
+              name="vat_number"
+              defaultValue={profile.vat_number ?? ""}
+              placeholder="BE0123456789"
+              icon={<Receipt className="h-3.5 w-3.5" />}
+              helper="Include country prefix (e.g. BE, NL, DE). We verify via VIES before applying reverse charge."
+            />
+            <InputField
+              label="Billing country"
+              name="billing_country"
+              defaultValue={profile.billing_country ?? ""}
+              placeholder="BE"
+              icon={<Globe className="h-3.5 w-3.5" />}
+              helper="ISO 3166-1 two-letter country code (e.g. BE, NL, DE, FR)."
+            />
+          </>
+        )}
+      </SectionCard>
 
       {/* ── Footer ───────────────────────────────────────────────────────── */}
       <div

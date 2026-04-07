@@ -8,6 +8,7 @@ import RichTextEditor from "@/components/RichTextEditor";
 import CancellationPolicyForm from "@/components/CancellationPolicyForm";
 import PropertyRulesForm from "@/components/PropertyRulesForm";
 import PricingInput from "@/components/PricingInput";
+import AddressAutocomplete from "@/components/AddressAutocomplete";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getTranslations } from "next-intl/server";
 import { Camera, CheckCircle, AlertTriangle, ShieldCheck, ClipboardList, RefreshCw } from "lucide-react";
 import { getPlatformConfig } from "@/lib/platform-config.server";
+import DiscardDraftGuard from "@/components/DiscardDraftGuard";
 
 async function EditListing(props: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string; saved?: string }> }) {
   const [params, search] = await Promise.all([props.params, props.searchParams]);
@@ -66,6 +68,18 @@ async function EditListing(props: { params: Promise<{ id: string }>; searchParam
 
   const existingImages = imageRows ?? [];
 
+  const addressLabels = {
+    search: "Search address…",
+    street: t("label_street"),
+    houseNumber: t("label_house_number"),
+    addition: t("label_addition"),
+    additionPlaceholder: t("placeholder_addition"),
+    zip: t("label_zip"),
+    zipPlaceholder: t("placeholder_zip"),
+    city: t("label_city"),
+    country: t("label_country"),
+  };
+
   const availabilityLabels = {
     title: t("availability_title"),
     start: t("availability_start"),
@@ -83,8 +97,14 @@ async function EditListing(props: { params: Promise<{ id: string }>; searchParam
       <div className="max-w-3xl mx-auto px-6 py-12 space-y-8">
 
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">{t("edit_title")}</h1>
-          <p className="text-muted-foreground mt-1">{data.title} — {data.city}, {data.country}</p>
+          <h1 className="text-3xl font-semibold tracking-tight">
+            {justCreated ? "New listing" : t("edit_title")}
+          </h1>
+          {!justCreated && (data.city || data.country) && (
+            <p className="text-muted-foreground mt-1">
+              {data.title}{data.city ? ` — ${data.city}` : ""}{data.country ? `, ${data.country}` : ""}
+            </p>
+          )}
         </div>
 
         {/* Pending review banner (after edit) */}
@@ -100,14 +120,17 @@ async function EditListing(props: { params: Promise<{ id: string }>; searchParam
           </div>
         )}
 
+        {/* Auto-delete this draft if the user leaves without saving */}
+        {justCreated && <DiscardDraftGuard listingId={data.id} />}
+
         {/* "Just created" welcome banner */}
         {justCreated && (
           <div className="flex items-start gap-3 bg-primary/5 border border-primary/20 rounded-2xl px-5 py-4">
             <CheckCircle className="h-5 w-5 text-primary shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-medium">Listing created! Now add photos.</p>
+              <p className="text-sm font-medium">Fill in your listing details</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Upload clear photos that show the full private setup — pool, garden, and exterior fences help with approval.
+                Complete all sections below — including photos, pricing, availability, cancellation policy, and house rules — then save to submit for admin review.
               </p>
             </div>
           </div>
@@ -170,14 +193,17 @@ async function EditListing(props: { params: Promise<{ id: string }>; searchParam
           <Card>
             <CardHeader><CardTitle className="text-base">{t("section_location")}</CardTitle></CardHeader>
             <CardContent>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2"><Label htmlFor="street">{t("label_street")}</Label><Input id="street" name="street" defaultValue={data.street} required /></div>
-                <div className="space-y-2"><Label htmlFor="house_number">{t("label_house_number")}</Label><Input id="house_number" name="house_number" defaultValue={data.house_number} required /></div>
-                <div className="space-y-2"><Label htmlFor="house_number_addition">{t("label_addition")}</Label><Input id="house_number_addition" name="house_number_addition" defaultValue={data.house_number_addition || ""} placeholder={t("placeholder_addition")} /></div>
-                <div className="space-y-2"><Label htmlFor="zip_code">{t("label_zip")}</Label><Input id="zip_code" name="zip_code" defaultValue={data.zip_code} required /></div>
-                <div className="space-y-2"><Label htmlFor="city">{t("label_city")}</Label><Input id="city" name="city" defaultValue={data.city} required /></div>
-                <div className="space-y-2"><Label htmlFor="country">{t("label_country")}</Label><Input id="country" name="country" defaultValue={data.country} required /></div>
-              </div>
+              <AddressAutocomplete
+                labels={addressLabels}
+                defaults={{
+                  street: data.street,
+                  houseNumber: data.house_number,
+                  addition: data.house_number_addition || "",
+                  zipCode: data.zip_code,
+                  city: data.city,
+                  country: data.country,
+                }}
+              />
             </CardContent>
           </Card>
 
@@ -234,7 +260,7 @@ async function EditListing(props: { params: Promise<{ id: string }>; searchParam
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <CancellationPolicyForm listingId={data.id} initial={cancellationPolicy} />
+            <CancellationPolicyForm listingId={data.id} initial={cancellationPolicy} listingTimezone={data.timezone ?? undefined} />
           </CardContent>
         </Card>
 

@@ -185,7 +185,7 @@ export default function ListingAlertPreferences({ initial, equipmentItems }: Pro
                   onClick={() => setShowAmenities((v) => !v)}
                   className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground hover:text-foreground transition"
                 >
-                  Required amenities
+                  Required equipment
                   {showAmenities ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                   {selectedAmenities.length > 0 && (
                     <span className="ml-1 bg-primary/15 text-primary rounded-full px-1.5 py-0.5 text-[10px] font-bold">
@@ -194,7 +194,7 @@ export default function ListingAlertPreferences({ initial, equipmentItems }: Pro
                   )}
                 </button>
                 <p className="text-[11px] text-muted-foreground/60">
-                  Only notify me if the property has at least one of the selected amenities.
+                  Only notify me if the listing has at least one of the selected equipment items.
                 </p>
 
                 {showAmenities && (

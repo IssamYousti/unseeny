@@ -85,7 +85,7 @@ const ROWS: Row[] = [
     higherIsBetter: true,
   },
   {
-    label: "Amenities",
+    label: "Equipment",
     getValue: (l) => l.amenities_count,
     format: (v) => (v !== null ? String(v) : "—"),
     higherIsBetter: true,

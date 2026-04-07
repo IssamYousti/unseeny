@@ -26,6 +26,10 @@ export async function updateProfile(
     .map((l) => l.trim())
     .filter(Boolean);
 
+  const is_business = formData.get("is_business") === "true";
+  const vat_number = (formData.get("vat_number") as string | null)?.trim().toUpperCase() || null;
+  const billing_country = (formData.get("billing_country") as string | null)?.trim().toUpperCase().slice(0, 2) || null;
+
   const { error } = await supabase
     .from("profiles")
     .update({
@@ -36,6 +40,11 @@ export async function updateProfile(
       host_bio,
       hosting_since: hosting_since || null,
       languages,
+      is_business,
+      // Reset vat_validated when the number changes — requires re-verification
+      vat_number: is_business ? vat_number : null,
+      vat_validated: false,
+      billing_country: is_business ? billing_country : null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", user.id);

@@ -68,19 +68,37 @@ function FitBounds({ listings }: { listings: MapListing[] }) {
   return null;
 }
 
-export default function ListingsMapInner({ listings }: { listings: MapListing[] }) {
+/** Flies to a specific location (used when a location filter is active) */
+function FlyToCenter({ center, zoom }: { center: [number, number]; zoom: number }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(center, zoom);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [center[0], center[1], zoom]);
+  return null;
+}
+
+export default function ListingsMapInner({
+  listings,
+  center,
+  zoom,
+}: {
+  listings: MapListing[];
+  center?: [number, number];
+  zoom?: number;
+}) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // Default center: Europe
-  const center: [number, number] =
-    listings.length > 0
+  // Initial center: use provided center, first listing, or Europe
+  const initialCenter: [number, number] =
+    center ?? (listings.length > 0
       ? [listings[0].latitude, listings[0].longitude]
-      : [48.8566, 2.3522];
+      : [48.8566, 2.3522]);
 
   return (
     <MapContainer
-      center={center}
-      zoom={5}
+      center={initialCenter}
+      zoom={zoom ?? 5}
       scrollWheelZoom
       zoomControl={false}
       style={{ height: "100%", width: "100%" }}
@@ -92,7 +110,10 @@ export default function ListingsMapInner({ listings }: { listings: MapListing[] 
         maxZoom={19}
       />
 
-      <FitBounds listings={listings} />
+      {center
+        ? <FlyToCenter center={center} zoom={zoom ?? 10} />
+        : <FitBounds listings={listings} />
+      }
 
       {/* Zoom control — bottom right */}
       {/* react-leaflet renders default zoom at top-left; we hide it via zoomControl=false */}

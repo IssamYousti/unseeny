@@ -87,8 +87,6 @@ export default function PropertyRulesForm({ listingId, initial }: Props) {
 
         <div className="grid sm:grid-cols-2 gap-3">
           <Toggle name="pets_allowed"   label="Pets allowed"              defaultChecked={r.pets_allowed ?? false} />
-          <Toggle name="smoking_allowed" label="Smoking allowed"          defaultChecked={r.smoking_allowed ?? false} />
-          <Toggle name="parties_allowed" label="Parties / events allowed" defaultChecked={r.parties_allowed ?? false} />
           <Toggle name="commercial_photography" label="Commercial photography allowed" defaultChecked={r.commercial_photography ?? false} />
         </div>
 

@@ -1,0 +1,4 @@
+-- VAT handling: use Stripe Tax instead of a fixed rate column.
+-- Stripe Tax automatically applies the correct country-specific VAT rate
+-- based on customer location and the accommodation tax code.
+-- No schema changes needed here — see Stripe Tax setup in the docs.

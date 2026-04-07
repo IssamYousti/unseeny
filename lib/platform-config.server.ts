@@ -10,12 +10,13 @@ export async function getPlatformConfig(): Promise<PlatformConfig> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("platform_config")
-    .select("host_fee_pct, guest_markup_pct")
+    .select("host_fee_pct, guest_markup_pct, vat_pct")
     .eq("id", "default")
     .maybeSingle();
   if (!data) return DEFAULT_CONFIG;
   return {
     host_fee_pct: Number(data.host_fee_pct),
     guest_markup_pct: Number(data.guest_markup_pct),
+    vat_pct: Number(data.vat_pct ?? DEFAULT_CONFIG.vat_pct),
   };
 }

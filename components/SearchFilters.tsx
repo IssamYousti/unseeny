@@ -107,6 +107,8 @@ export default function SearchFilters({ labels, amenityItems }: Props) {
     const location = (fd.get("location") as string)?.trim();
     const locationCity = (fd.get("locationCity") as string)?.trim();
     const locationCountry = (fd.get("locationCountry") as string)?.trim();
+    const locationLat = (fd.get("locationLat") as string)?.trim();
+    const locationLon = (fd.get("locationLon") as string)?.trim();
     const guests = fd.get("guests") as string;
     const minPrice = fd.get("minPrice") as string;
     const maxPrice = fd.get("maxPrice") as string;
@@ -116,6 +118,8 @@ export default function SearchFilters({ labels, amenityItems }: Props) {
     if (location) params.set("location", location);
     if (locationCity) params.set("locationCity", locationCity);
     if (locationCountry) params.set("locationCountry", locationCountry);
+    if (locationLat) params.set("locationLat", locationLat);
+    if (locationLon) params.set("locationLon", locationLon);
     if (guests && Number(guests) > 1) params.set("guests", guests);
     if (minPrice && Number(minPrice) > 0) params.set("minPrice", minPrice);
     if (maxPrice && Number(maxPrice) > 0) params.set("maxPrice", maxPrice);

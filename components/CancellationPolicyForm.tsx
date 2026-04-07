@@ -1,20 +1,31 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { CheckCircle2, AlertCircle, ChevronDown } from "lucide-react";
-import { POLICY_PRESETS, POLICY_LABELS, POLICY_SUMMARIES, COMMON_TIMEZONES, type PolicyType, type CancellationPolicy } from "@/lib/cancellation";
+import { useState, useTransition, useEffect } from "react";
+import { CheckCircle2, AlertCircle } from "lucide-react";
+import { POLICY_PRESETS, POLICY_LABELS, POLICY_SUMMARIES, type PolicyType, type CancellationPolicy } from "@/lib/cancellation";
 import { saveCancellationPolicy } from "@/app/(protected)/listings/manage/[id]/policy-actions";
 
 type Props = {
   listingId: string;
   initial: Partial<CancellationPolicy> | null;
+  /** IANA timezone auto-detected from the listing's address. Used as default when no policy has been saved yet. */
+  listingTimezone?: string;
 };
 
 const TYPES: PolicyType[] = ["flexible", "moderate", "strict", "custom"];
 
-export default function CancellationPolicyForm({ listingId, initial }: Props) {
+export default function CancellationPolicyForm({ listingId, initial, listingTimezone }: Props) {
   const [type, setType] = useState<PolicyType>(initial?.policy_type ?? "moderate");
-  const [timezone, setTimezone] = useState(initial?.timezone ?? "UTC");
+  const [timezone, setTimezone] = useState(initial?.timezone ?? listingTimezone ?? "UTC");
+
+  // Update timezone live when the host selects an address in the address autocomplete
+  useEffect(() => {
+    function handler(e: Event) {
+      setTimezone((e as CustomEvent<string>).detail);
+    }
+    window.addEventListener("unseeny:timezone-detected", handler);
+    return () => window.removeEventListener("unseeny:timezone-detected", handler);
+  }, []);
   const [status, setStatus] = useState<"idle" | "saved" | "error">("idle");
   const [errMsg, setErrMsg] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -164,28 +175,12 @@ export default function CancellationPolicyForm({ listingId, initial }: Props) {
         </>
       )}
 
-      {/* Timezone */}
-      <div className="space-y-1.5 max-w-sm">
-        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-          Listing timezone
-        </label>
-        <div className="relative">
-          <select
-            name="timezone"
-            value={timezone}
-            onChange={(e) => setTimezone(e.target.value)}
-            className="w-full appearance-none bg-background border border-border rounded-xl px-3 py-2 text-sm pr-8 focus:outline-none focus:ring-2 focus:ring-primary/30"
-          >
-            {COMMON_TIMEZONES.map((tz) => (
-              <option key={tz.value} value={tz.value}>{tz.label}</option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-        </div>
-        <p className="text-xs text-muted-foreground/60">
-          Cancellation deadlines are shown in this timezone to guests.
-        </p>
-      </div>
+      {/* Timezone — auto-detected from the listing address, not editable */}
+      <input type="hidden" name="timezone" value={timezone} />
+      <p className="text-xs text-muted-foreground/60">
+        Timezone: <span className="font-medium text-foreground">{timezone}</span>
+        {" "}— auto-detected from the listing address. Cancellation deadlines are shown in this timezone.
+      </p>
 
       {/* Save */}
       <div className="flex items-center gap-4">

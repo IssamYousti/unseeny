@@ -6,11 +6,13 @@
 export type PlatformConfig = {
   host_fee_pct: number;     // deducted from host's base price
   guest_markup_pct: number; // added on top of base price for guest
+  vat_pct: number;          // applied to service fees only (not accommodation)
 };
 
 export const DEFAULT_CONFIG: PlatformConfig = {
   host_fee_pct: 0.02,
   guest_markup_pct: 0.10,
+  vat_pct: 0.21,            // Belgium — switch to per-country once OSS is active
 };
 
 // ─── Pricing calculations ─────────────────────────────────────────────────────

@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, Euro, TrendingUp, Landmark } from "lucide-react";
+import { Euro, TrendingUp, Landmark, Receipt } from "lucide-react";
 import {
   hostEarnsToGuestPrice,
   guestPriceToHostPayout,
-  calcPlatformTake,
   type PlatformConfig,
 } from "@/lib/platform-config";
+import { calcVatBreakdown, hostNetToGuestPrice } from "@/lib/vat";
 
 type PriceType = "guest_pays" | "host_earns";
 
@@ -25,48 +25,44 @@ export default function PricingInput({ config, defaultPrice, defaultPriceType = 
   const [priceType, setPriceType] = useState<PriceType>(defaultPriceType);
   const [amount, setAmount] = useState<number>(defaultPrice ?? 0);
 
-  const guestPrice =
+  // Derive the guest price (excl. VAT) — the value stored as price_per_night
+  const guestPriceExclVat =
     priceType === "guest_pays"
       ? amount
-      : hostEarnsToGuestPrice(amount, config);
+      : hostNetToGuestPrice(amount, config.guest_markup_pct, config.host_fee_pct, config.vat_pct);
 
-  const hostPayout =
+  const hostPayoutLegacy =
     priceType === "host_earns"
       ? amount
       : guestPriceToHostPayout(amount, config);
 
-  const platformTake = guestPrice - hostPayout;
-  const hostFeePct = Math.round(config.host_fee_pct * 100);
-  const guestMarkupPct = Math.round(config.guest_markup_pct * 100);
+  const vatPct = Math.round(config.vat_pct * 100);
+
+  // Full VAT breakdown (B2C assumption for display — actual treatment calculated at booking)
+  const vat = amount > 0
+    ? calcVatBreakdown(guestPriceExclVat, config.guest_markup_pct, config.host_fee_pct, config.vat_pct)
+    : null;
 
   return (
     <div className="space-y-5">
       {/* Hidden fields consumed by the parent form */}
-      <input type="hidden" name="price_per_night" value={amount > 0 ? fmt(guestPrice).replace(/,/g, "") : ""} />
-      <input type="hidden" name="host_payout_per_night" value={amount > 0 ? fmt(hostPayout).replace(/,/g, "") : ""} />
-      <input type="hidden" name="price_type" value={priceType} />
+      <input type="hidden" name="price_per_night"       value={guestPriceExclVat > 0 ? fmt(guestPriceExclVat).replace(/,/g, "") : ""} />
+      <input type="hidden" name="host_payout_per_night" value={hostPayoutLegacy > 0  ? fmt(hostPayoutLegacy).replace(/,/g, "")  : ""} />
+      <input type="hidden" name="price_type"            value={priceType} />
 
-      {/* Price type toggle */}
+      {/* Mode toggle */}
       <div className="inline-flex rounded-xl border border-border overflow-hidden text-sm">
         <button
           type="button"
           onClick={() => setPriceType("guest_pays")}
-          className={`px-4 py-2 font-medium transition ${
-            priceType === "guest_pays"
-              ? "bg-primary text-primary-foreground"
-              : "bg-background text-muted-foreground hover:text-foreground"
-          }`}
+          className={`px-4 py-2 font-medium transition ${priceType === "guest_pays" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:text-foreground"}`}
         >
           Guest pays this
         </button>
         <button
           type="button"
           onClick={() => setPriceType("host_earns")}
-          className={`px-4 py-2 font-medium transition ${
-            priceType === "host_earns"
-              ? "bg-primary text-primary-foreground"
-              : "bg-background text-muted-foreground hover:text-foreground"
-          }`}
+          className={`px-4 py-2 font-medium transition ${priceType === "host_earns" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:text-foreground"}`}
         >
           I earn this
         </button>
@@ -74,9 +70,7 @@ export default function PricingInput({ config, defaultPrice, defaultPriceType = 
 
       {/* Amount input */}
       <div className="relative max-w-xs">
-        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground font-medium select-none">
-          €
-        </span>
+        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground font-medium select-none">€</span>
         <input
           type="number"
           min={1}
@@ -87,69 +81,125 @@ export default function PricingInput({ config, defaultPrice, defaultPriceType = 
           className="w-full bg-background border border-border rounded-xl pl-8 pr-4 py-2.5 text-base font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30"
           required
         />
+        {priceType === "host_earns" && (
+          <p className="mt-1.5 text-xs text-muted-foreground/60">
+            Net amount you receive after commission &amp; VAT on commission.
+          </p>
+        )}
       </div>
 
-      {/* Live simulation */}
-      {amount > 0 && (
-        <div className="bg-muted/30 border border-border/60 rounded-2xl overflow-hidden">
-          <div className="px-5 py-3 border-b border-border/60">
-            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              Pricing breakdown · per night
+      {/* Full breakdown */}
+      {vat && (
+        <div className="bg-muted/30 border border-border/60 rounded-2xl overflow-hidden text-sm">
+
+          {/* ── Guest side ─────────────────────────────────────── */}
+          <div className="px-5 py-2.5 border-b border-border/60 bg-muted/20">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+              What the guest pays
             </p>
           </div>
 
-          <div className="divide-y divide-border/40">
-            {/* Guest pays */}
-            <div className="flex items-center justify-between px-5 py-3.5">
-              <div className="flex items-center gap-2.5 text-sm">
-                <Euro className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="font-medium">Guest pays</span>
-                {priceType === "host_earns" && (
-                  <span className="text-xs text-muted-foreground">
-                    (incl. {guestMarkupPct}% service fee)
-                  </span>
-                )}
-              </div>
-              <span className={`text-sm font-bold ${priceType === "host_earns" ? "text-foreground" : "text-primary"}`}>
-                €{fmt(guestPrice)}
-              </span>
-            </div>
+          <Row
+            icon={<Euro className="h-4 w-4 text-muted-foreground" />}
+            label="Accommodation"
+            sub="host's supply — no platform VAT"
+            value={`€${fmt(vat.accommodationBase)}`}
+          />
+          <Row
+            icon={<Landmark className="h-4 w-4 text-muted-foreground" />}
+            label={`Service fee (${Math.round(config.guest_markup_pct * 100)}%)`}
+            sub="excl. VAT"
+            value={`€${fmt(vat.guestFeeExclVat)}`}
+          />
+          <Row
+            icon={<Receipt className="h-4 w-4 text-muted-foreground" />}
+            label={`VAT ${vatPct}% on service fee`}
+            sub="platform collects & remits"
+            value={`€${fmt(vat.guestFeeVatAmount)}`}
+            highlight
+          />
 
-            {/* Platform take */}
-            <div className="flex items-center justify-between px-5 py-3.5">
-              <div className="flex items-center gap-2.5 text-sm">
-                <Landmark className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="text-muted-foreground">Platform fees</span>
-                <span className="text-xs text-muted-foreground/60">
-                  ({guestMarkupPct}% + {hostFeePct}%)
-                </span>
-              </div>
-              <span className="text-sm text-muted-foreground">−€{fmt(platformTake)}</span>
-            </div>
+          <div className="flex items-center justify-between px-5 py-3.5 bg-primary/[0.04] border-t border-border/60">
+            <span className="font-semibold">Guest total (Stripe charge)</span>
+            <span className="font-bold text-primary">€{fmt(vat.guestTotal)}</span>
+          </div>
 
-            {/* Arrow */}
-            <div className="flex justify-center py-1 bg-muted/20">
-              <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/40 rotate-90" />
-            </div>
+          {/* ── Host side ──────────────────────────────────────── */}
+          <div className="px-5 py-2.5 border-t border-border/60 bg-muted/20">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+              Your payout
+            </p>
+          </div>
 
-            {/* Host earns */}
-            <div className="flex items-center justify-between px-5 py-3.5 bg-primary/[0.03]">
-              <div className="flex items-center gap-2.5 text-sm">
-                <TrendingUp className="h-4 w-4 text-primary shrink-0" />
-                <span className="font-semibold">You earn</span>
-                {priceType === "guest_pays" && (
-                  <span className="text-xs text-muted-foreground">
-                    (after {hostFeePct}% fee)
-                  </span>
-                )}
-              </div>
-              <span className={`text-base font-bold ${priceType === "host_earns" ? "text-primary" : "text-foreground"}`}>
-                €{fmt(hostPayout)}
-              </span>
+          <Row
+            icon={<Euro className="h-4 w-4 text-muted-foreground" />}
+            label="Accommodation revenue"
+            value={`€${fmt(vat.accommodationBase)}`}
+          />
+          <Row
+            icon={<Landmark className="h-4 w-4 text-muted-foreground" />}
+            label={`Platform commission (${Math.round(config.host_fee_pct * 100)}%)`}
+            value={`−€${fmt(vat.hostCommissionExcl)}`}
+            muted
+          />
+          <Row
+            icon={<Receipt className="h-4 w-4 text-muted-foreground" />}
+            label={`VAT ${vatPct}% on commission`}
+            sub="deducted from payout"
+            value={`−€${fmt(vat.hostCommissionVatAmount)}`}
+            muted
+          />
+
+          <div className="flex items-center justify-between px-5 py-3.5 bg-primary/[0.04] border-t border-border/60">
+            <div className="flex items-center gap-2.5">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              <span className="font-semibold">You receive</span>
             </div>
+            <span className="font-bold text-base">€{fmt(vat.hostPayout)}</span>
+          </div>
+
+          {/* ── Platform summary ───────────────────────────────── */}
+          <div className="px-5 py-3 border-t border-border/60 bg-muted/10 flex items-center justify-between">
+            <span className="text-xs text-muted-foreground/60">
+              Platform net (after remitting €{fmt(vat.platformVatLiability)} VAT)
+            </span>
+            <span className="text-xs text-muted-foreground/60">
+              €{fmt(vat.platformNet)}
+            </span>
           </div>
         </div>
       )}
+
+      <p className="text-xs text-muted-foreground/50">
+        VAT ({vatPct}%) applies to Unseeny's service fees only, not the accommodation.
+        Shown for B2C guests. Reverse charge applies for VAT-registered guests/hosts.
+      </p>
+    </div>
+  );
+}
+
+function Row({
+  icon, label, sub, value, muted, highlight,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  sub?: string;
+  value: string;
+  muted?: boolean;
+  highlight?: boolean;
+}) {
+  return (
+    <div className={`flex items-center justify-between px-5 py-3 border-b border-border/30 ${highlight ? "bg-amber-500/[0.03]" : ""}`}>
+      <div className="flex items-center gap-2.5">
+        {icon}
+        <div>
+          <span className={muted ? "text-muted-foreground" : ""}>{label}</span>
+          {sub && <p className="text-[11px] text-muted-foreground/50 leading-none mt-0.5">{sub}</p>}
+        </div>
+      </div>
+      <span className={`font-medium tabular-nums ${muted ? "text-muted-foreground" : highlight ? "text-amber-600 dark:text-amber-400" : ""}`}>
+        {value}
+      </span>
     </div>
   );
 }
